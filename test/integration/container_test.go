@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -13,6 +14,9 @@ import (
 func startOpenFGA(ctx context.Context, t *testing.T) (string, func()) {
 	t.Helper()
 	image := "openfga/openfga:latest"
+	if v := os.Getenv("OPENFGA_IMAGE"); v != "" {
+		image = v
+	}
 	req := testcontainers.ContainerRequest{
 		Image:        image,
 		Cmd:          []string{"run"},

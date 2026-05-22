@@ -2,7 +2,6 @@ package integration
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/cucumber/godog"
@@ -11,10 +10,8 @@ import (
 
 type suiteState struct {
 	client  *openfga.Client
-	storeID string
 	modelID string
 	allowed bool
-	lastErr error
 }
 
 func TestFeatures(t *testing.T) {
@@ -41,5 +38,4 @@ func TestFeatures(t *testing.T) {
 	if suite.Run() != 0 {
 		t.Fatal("non-zero godog status")
 	}
-	_ = os.Getenv // reserved for OPENFGA_IMAGE override hook
 }

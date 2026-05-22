@@ -21,7 +21,6 @@ func (st *suiteState) freshStoreWithModel(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	st.storeID = store.ID
 	st.client = mustWithStore(st.client, store.ID)
 
 	model := &openfga.WriteAuthorizationModelRequest{
@@ -62,7 +61,6 @@ func (st *suiteState) check(ctx context.Context, user, relation, object string) 
 		AuthorizationModelID: st.modelID,
 		TupleKey:             openfga.CheckRequestTupleKey{User: user, Relation: relation, Object: object},
 	})
-	st.lastErr = err
 	if err != nil {
 		return err
 	}
