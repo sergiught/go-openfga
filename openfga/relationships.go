@@ -1,6 +1,11 @@
 package openfga
 
-import "context"
+import (
+	"context"
+	"encoding/json"
+	"iter"
+	"net/http"
+)
 
 // fillDefaults populates modelID and consistency from the client's defaults
 // and per-call options, but only when the caller left them empty. It operates
@@ -62,4 +67,43 @@ func (s *RelationshipsService) ListUsers(ctx context.Context, req *ListUsersRequ
 	out := new(ListUsersResponse)
 	resp, err := s.client.doStorePost(ctx, "/list-users", &r, out, opts)
 	return out, resp, err
+}
+
+// StreamedListObjects streams matching objects, decoding the NDJSON response
+// lazily. The HTTP connection stays open until iteration ends or the caller breaks.
+// Each yielded error value is non-nil only on failure; on success it is nil.
+func (s *RelationshipsService) StreamedListObjects(ctx context.Context, req *ListObjectsRequest, opts ...RequestOption) iter.Seq2[StreamedListObjectsResponse, error] {
+	r := *req
+	s.fillDefaults(opts, &r.AuthorizationModelID, &r.Consistency)
+	return func(yield func(StreamedListObjectsResponse, error) bool) {
+		rc := newRequestConfig()
+		applyOptions(rc, opts)
+		store, err := s.client.storeFor(rc)
+		if err != nil {
+			yield(StreamedListObjectsResponse{}, err)
+			return
+		}
+		httpReq, err := s.client.newRequest(ctx, http.MethodPost, "/stores/"+store+"/streamed-list-objects", &r, rc.header)
+		if err != nil {
+			yield(StreamedListObjectsResponse{}, err)
+			return
+		}
+		resp, err := s.client.BareDo(httpReq)
+		if err != nil {
+			yield(StreamedListObjectsResponse{}, err)
+			return
+		}
+		defer resp.Body.Close()
+		dec := json.NewDecoder(resp.Body)
+		for dec.More() {
+			var env streamedEnvelope
+			if err := dec.Decode(&env); err != nil {
+				yield(StreamedListObjectsResponse{}, err)
+				return
+			}
+			if !yield(env.Result, nil) {
+				return
+			}
+		}
+	}
 }

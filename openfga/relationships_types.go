@@ -115,3 +115,13 @@ type ListUsersRequest struct {
 type ListUsersResponse struct {
 	Users []map[string]any `json:"users"`
 }
+
+// StreamedListObjectsResponse is one NDJSON line of the streaming response.
+// The server wraps each item under "result".
+type StreamedListObjectsResponse struct {
+	Object string `json:"object"`
+}
+
+type streamedEnvelope struct {
+	Result StreamedListObjectsResponse `json:"result"`
+}
