@@ -1,0 +1,82 @@
+package openfga
+
+import "time"
+
+// RelationshipCondition is an optional ABAC condition attached to a tuple.
+type RelationshipCondition struct {
+	Name    string         `json:"name"`
+	Context map[string]any `json:"context,omitempty"`
+}
+
+// TupleKey identifies a relationship triple, with an optional condition.
+type TupleKey struct {
+	User      string                 `json:"user"`
+	Relation  string                 `json:"relation"`
+	Object    string                 `json:"object"`
+	Condition *RelationshipCondition `json:"condition,omitempty"`
+}
+
+// Tuple is a stored relationship triple with a server-assigned timestamp.
+type Tuple struct {
+	Key       TupleKey  `json:"key"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// WriteRequest is the body for Tuples.Write.
+type WriteRequest struct {
+	Writes               *WriteRequestTuples `json:"writes,omitempty"`
+	Deletes              *WriteRequestTuples `json:"deletes,omitempty"`
+	AuthorizationModelID string              `json:"authorization_model_id,omitempty"`
+}
+
+// WriteRequestTuples carries a list of tuple keys for a write or delete operation.
+type WriteRequestTuples struct {
+	TupleKeys []TupleKey `json:"tuple_keys"`
+}
+
+// ReadRequestTupleKey is a partial tuple key used as a filter in Read requests.
+// All fields are optional; omit a field to match any value.
+type ReadRequestTupleKey struct {
+	User     string `json:"user,omitempty"`
+	Relation string `json:"relation,omitempty"`
+	Object   string `json:"object,omitempty"`
+}
+
+// ReadRequest is the body for Tuples.Read.
+type ReadRequest struct {
+	TupleKey          *ReadRequestTupleKey  `json:"tuple_key,omitempty"`
+	PageSize          int                   `json:"page_size,omitempty"`
+	ContinuationToken string                `json:"continuation_token,omitempty"`
+	Consistency       ConsistencyPreference `json:"consistency,omitempty"`
+}
+
+// ReadResponse is the result of a Tuples.Read call.
+type ReadResponse struct {
+	Tuples            []Tuple `json:"tuples"`
+	ContinuationToken string  `json:"continuation_token"`
+}
+
+func (r *ReadResponse) continuationToken() string { return r.ContinuationToken }
+
+// ReadChangesOptions controls filtering and pagination for Tuples.ReadChanges.
+type ReadChangesOptions struct {
+	Type              string
+	PageSize          int
+	ContinuationToken string
+	StartTime         string // RFC3339; optional
+}
+
+// TupleChange describes a single write or delete event in the changelog.
+type TupleChange struct {
+	TupleKey  TupleKey  `json:"tuple_key"`
+	Operation string    `json:"operation"` // TUPLE_OPERATION_WRITE | TUPLE_OPERATION_DELETE
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// ReadChangesResponse is the result of a Tuples.ReadChanges call.
+type ReadChangesResponse struct {
+	Changes           []TupleChange `json:"changes"`
+	ContinuationToken string        `json:"continuation_token"`
+}
+
+func (r *ReadChangesResponse) continuationToken() string { return r.ContinuationToken }
