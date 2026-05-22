@@ -45,3 +45,10 @@ func TestWithHTTPClient_Honored(t *testing.T) {
 		t.Error("WithHTTPClient not honored")
 	}
 }
+
+func TestClient_BaseURL(t *testing.T) {
+	c, _ := NewClient("https://api.fga.example")
+	if c.BaseURL() != "https://api.fga.example/" {
+		t.Errorf("BaseURL = %q", c.BaseURL())
+	}
+}

@@ -144,3 +144,6 @@ func (c *Client) modelFor(rc *requestConfig) string {
 	}
 	return c.authModelID
 }
+
+// BaseURL returns the API base URL the client targets.
+func (c *Client) BaseURL() string { return c.baseURL.String() }
