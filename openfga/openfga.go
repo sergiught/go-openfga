@@ -98,8 +98,10 @@ func WithAuthorizationModelID(id string) Option { return func(c *Client) { c.aut
 // WithUserAgent overrides the User-Agent header sent on every request.
 func WithUserAgent(ua string) Option { return func(c *Client) { c.userAgent = ua } }
 
-// WithHTTPClient supplies a fully-configured *http.Client (escape hatch). When
-// set, the SDK does not assemble its own transport chain.
+// WithHTTPClient supplies a fully-configured *http.Client (escape hatch). When set, the SDK does NOT
+// assemble its own transport chain, so WithAPIToken, WithClientCredentials, WithPrivateKeyJWT,
+// WithHeaders, and WithRetry have no effect — configure auth, headers, and retries on the supplied
+// client's Transport yourself.
 func WithHTTPClient(hc *http.Client) Option { return func(c *Client) { c.client = hc } }
 
 // WithBaseURL overrides the API base URL after construction-time parsing.

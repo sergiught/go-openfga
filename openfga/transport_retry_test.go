@@ -9,6 +9,9 @@ import (
 	"time"
 )
 
+// noWait is the test no-op wait: returns immediately without sleeping.
+func noWait(_ context.Context, _ time.Duration) error { return nil }
+
 // scriptRT returns the queued responses/status codes in order.
 type scriptRT struct {
 	statuses []int
@@ -36,13 +39,11 @@ func (s *scriptRT) RoundTrip(r *http.Request) (*http.Response, error) {
 	}, nil
 }
 
-func noSleep(time.Duration) {}
-
 func TestRetry_RetriesOn429ThenSucceeds(t *testing.T) {
 	rt := &retryTransport{
-		base:  &scriptRT{statuses: []int{429, 429, 200}},
-		cfg:   RetryConfig{MaxAttempts: 3, MinWait: time.Millisecond, MaxWait: time.Millisecond, RetryableStatus: []int{429}},
-		sleep: noSleep,
+		base: &scriptRT{statuses: []int{429, 429, 200}},
+		cfg:  RetryConfig{MaxAttempts: 3, MinWait: time.Millisecond, MaxWait: time.Millisecond, RetryableStatus: []int{429}},
+		wait: noWait,
 	}
 	req, _ := http.NewRequest(http.MethodPost, "https://x/", bytes.NewBufferString(`{}`))
 	resp, err := rt.RoundTrip(req)
@@ -56,7 +57,7 @@ func TestRetry_RetriesOn429ThenSucceeds(t *testing.T) {
 
 func TestRetry_DoesNotRetry5xxByDefault(t *testing.T) {
 	base := &scriptRT{statuses: []int{500, 200}}
-	rt := &retryTransport{base: base, cfg: RetryConfig{MaxAttempts: 3, RetryableStatus: []int{429}}, sleep: noSleep}
+	rt := &retryTransport{base: base, cfg: RetryConfig{MaxAttempts: 3, RetryableStatus: []int{429}}, wait: noWait}
 	req, _ := http.NewRequest(http.MethodGet, "https://x/", nil)
 	resp, _ := rt.RoundTrip(req)
 	if resp.StatusCode != 500 {
@@ -69,7 +70,7 @@ func TestRetry_DoesNotRetry5xxByDefault(t *testing.T) {
 
 func TestRetry_RespectsMaxAttempts(t *testing.T) {
 	base := &scriptRT{statuses: []int{429, 429, 429, 429}}
-	rt := &retryTransport{base: base, cfg: RetryConfig{MaxAttempts: 3, MinWait: time.Millisecond, RetryableStatus: []int{429}}, sleep: noSleep}
+	rt := &retryTransport{base: base, cfg: RetryConfig{MaxAttempts: 3, MinWait: time.Millisecond, RetryableStatus: []int{429}}, wait: noWait}
 	req, _ := http.NewRequest(http.MethodGet, "https://x/", nil)
 	_, _ = rt.RoundTrip(req)
 	if base.calls != 3 {
@@ -79,14 +80,17 @@ func TestRetry_RespectsMaxAttempts(t *testing.T) {
 
 func TestRetry_HonorsRetryAfterHeader(t *testing.T) {
 	// Build a custom base that adds Retry-After on the first response.
-	var sleptFor time.Duration
-	recordSleep := func(d time.Duration) { sleptFor = d }
+	var waitedFor time.Duration
+	recordWait := func(_ context.Context, d time.Duration) error {
+		waitedFor = d
+		return nil
+	}
 
 	innerBase := &retryAfterScriptRT{statuses: []int{429, 200}, retryAfter: "1"}
 	rt := &retryTransport{
-		base:  innerBase,
-		cfg:   RetryConfig{MaxAttempts: 2, MinWait: time.Millisecond, RetryableStatus: []int{429}, HonorRetryAfter: true},
-		sleep: recordSleep,
+		base: innerBase,
+		cfg:  RetryConfig{MaxAttempts: 2, MinWait: time.Millisecond, RetryableStatus: []int{429}, HonorRetryAfter: true},
+		wait: recordWait,
 	}
 	req, _ := http.NewRequest(http.MethodGet, "https://x/", nil)
 	resp, err := rt.RoundTrip(req)
@@ -96,8 +100,8 @@ func TestRetry_HonorsRetryAfterHeader(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Errorf("status = %d", resp.StatusCode)
 	}
-	if sleptFor != time.Second {
-		t.Errorf("sleptFor = %v, want 1s (from Retry-After header)", sleptFor)
+	if waitedFor != time.Second {
+		t.Errorf("waitedFor = %v, want 1s (from Retry-After header)", waitedFor)
 	}
 }
 
@@ -128,10 +132,10 @@ func TestRetry_ContextCancellationReturnsCtxErr(t *testing.T) {
 	cancel() // cancel immediately
 
 	base := &scriptRT{statuses: []int{429, 429, 200}}
+	// Use the real defaultWait so cancellation is honoured during the wait itself.
 	rt := &retryTransport{
-		base:  base,
-		cfg:   RetryConfig{MaxAttempts: 3, MinWait: time.Millisecond, RetryableStatus: []int{429}},
-		sleep: noSleep,
+		base: base,
+		cfg:  RetryConfig{MaxAttempts: 3, MinWait: time.Millisecond, RetryableStatus: []int{429}},
 	}
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://x/", nil)
 	_, err := rt.RoundTrip(req)
@@ -140,5 +144,42 @@ func TestRetry_ContextCancellationReturnsCtxErr(t *testing.T) {
 	}
 	if err != context.Canceled {
 		t.Errorf("err = %v, want context.Canceled", err)
+	}
+}
+
+// TestRetry_ContextCancelDuringBackoff verifies that a long backoff is interrupted
+// when the caller's context is cancelled mid-wait.
+func TestRetry_ContextCancelDuringBackoff(t *testing.T) {
+	base := &scriptRT{statuses: []int{429, 200}}
+	rt := &retryTransport{
+		base: base,
+		cfg: RetryConfig{
+			MaxAttempts:     2,
+			MinWait:         30 * time.Second, // would block for 30s without cancellation
+			MaxWait:         30 * time.Second,
+			RetryableStatus: []int{429},
+			HonorRetryAfter: false,
+			Jitter:          false,
+		},
+		// Use the real defaultWait so context cancellation is exercised.
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	// Cancel the context ~20ms after RoundTrip starts (giving it time to hit the wait).
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		cancel()
+	}()
+
+	start := time.Now()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://x/", nil)
+	_, err := rt.RoundTrip(req)
+	elapsed := time.Since(start)
+
+	if err != context.Canceled {
+		t.Fatalf("err = %v, want context.Canceled", err)
+	}
+	if elapsed > 2*time.Second {
+		t.Errorf("RoundTrip took %v, want < 2s (should have been cancelled during backoff)", elapsed)
 	}
 }

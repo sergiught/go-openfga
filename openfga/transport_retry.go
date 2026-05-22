@@ -2,6 +2,7 @@ package openfga
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"math"
 	"math/rand"
@@ -37,15 +38,29 @@ func WithRetry(cfg RetryConfig) Option { return func(c *Client) { c.retry = &cfg
 func WithoutRetry() Option { return func(c *Client) { c.retry = nil } }
 
 type retryTransport struct {
-	base  http.RoundTripper
-	cfg   RetryConfig
-	sleep func(time.Duration) // injectable for tests; nil => time.Sleep
+	base http.RoundTripper
+	cfg  RetryConfig
+	// wait is injectable for tests; nil uses the default cancellable timer/select.
+	// It should block for duration d (or until ctx is cancelled) and return ctx.Err() or nil.
+	wait func(ctx context.Context, d time.Duration) error
+}
+
+// defaultWait is the production wait: blocks for d or until ctx is cancelled.
+func defaultWait(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	select {
+	case <-ctx.Done():
+		timer.Stop()
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func (t *retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	sleep := t.sleep
-	if sleep == nil {
-		sleep = time.Sleep
+	waitFn := t.wait
+	if waitFn == nil {
+		waitFn = defaultWait
 	}
 	// Buffer body for replay across attempts.
 	var bodyBytes []byte
@@ -77,17 +92,14 @@ func (t *retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		if attempt == max-1 || !t.retryable(resp.StatusCode) {
 			return resp, nil
 		}
-		wait := t.backoff(attempt, resp)
+		d := t.backoff(attempt, resp)
 		// Drain and close the soon-to-be-discarded body.
 		_, _ = io.Copy(io.Discard, resp.Body)
 		_ = resp.Body.Close()
 
-		select {
-		case <-req.Context().Done():
-			return nil, req.Context().Err()
-		default:
+		if werr := waitFn(req.Context(), d); werr != nil {
+			return nil, werr
 		}
-		sleep(wait)
 	}
 	return resp, err
 }
