@@ -31,17 +31,38 @@ func (e *ErrorResponse) statusCode() int {
 	return e.Response.StatusCode
 }
 
-// Typed errors. Each embeds *ErrorResponse so errors.As reaches the base too.
+// ValidationError is returned for HTTP 400 responses.
 type ValidationError struct{ *ErrorResponse }
+
+// Unwrap allows errors.As to reach the embedded *ErrorResponse.
+func (e *ValidationError) Unwrap() error { return e.ErrorResponse }
+
+// AuthenticationError is returned for HTTP 401 and 403 responses.
 type AuthenticationError struct{ *ErrorResponse }
+
+// Unwrap allows errors.As to reach the embedded *ErrorResponse.
+func (e *AuthenticationError) Unwrap() error { return e.ErrorResponse }
+
+// NotFoundError is returned for HTTP 404 responses.
 type NotFoundError struct{ *ErrorResponse }
+
+// Unwrap allows errors.As to reach the embedded *ErrorResponse.
+func (e *NotFoundError) Unwrap() error { return e.ErrorResponse }
+
+// InternalError is returned for HTTP 5xx responses.
 type InternalError struct{ *ErrorResponse }
+
+// Unwrap allows errors.As to reach the embedded *ErrorResponse.
+func (e *InternalError) Unwrap() error { return e.ErrorResponse }
 
 // RateLimitError is returned on HTTP 429.
 type RateLimitError struct {
 	*ErrorResponse
 	RetryAfter time.Duration
 }
+
+// Unwrap allows errors.As to reach the embedded *ErrorResponse.
+func (e *RateLimitError) Unwrap() error { return e.ErrorResponse }
 
 // CheckResponse maps an *http.Response to a typed error, or nil for 2xx.
 // It consumes the response body.

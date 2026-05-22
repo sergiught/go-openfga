@@ -25,3 +25,29 @@ func TestHeaderTransport_AddsHeaders(t *testing.T) {
 		t.Error("static header not applied")
 	}
 }
+
+func TestHeaderTransport_PerRequestHeaderTakesPrecedence(t *testing.T) {
+	cap := &captureRT{}
+	static := http.Header{}
+	static.Set("X-Foo", "static")
+	static.Set("X-Only-Static", "from-static")
+	rt := &headerTransport{base: cap, header: static}
+
+	req, _ := http.NewRequest(http.MethodGet, "https://x/", nil)
+	req.Header.Set("X-Foo", "req") // per-request value should win
+
+	if _, err := rt.RoundTrip(req); err != nil {
+		t.Fatal(err)
+	}
+
+	// Per-request header wins; static must not overwrite or duplicate it.
+	vals := cap.last.Header["X-Foo"]
+	if len(vals) != 1 || vals[0] != "req" {
+		t.Errorf("X-Foo = %v, want [req]", vals)
+	}
+
+	// Static header absent on request IS applied.
+	if cap.last.Header.Get("X-Only-Static") != "from-static" {
+		t.Errorf("X-Only-Static = %q, want from-static", cap.last.Header.Get("X-Only-Static"))
+	}
+}

@@ -1,6 +1,7 @@
 package openfga
 
 import (
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -46,7 +47,7 @@ func NewClient(apiURL string, opts ...Option) (*Client, error) {
 		return nil, err
 	}
 	if u.Scheme == "" || u.Host == "" {
-		return nil, &ErrorResponse{Message: "invalid api url: " + apiURL}
+		return nil, errors.New("invalid api url: " + apiURL)
 	}
 
 	c := &Client{
@@ -88,9 +89,14 @@ func (c *Client) buildTransport(base http.RoundTripper) http.RoundTripper {
 	return rt
 }
 
-func WithStoreID(id string) Option              { return func(c *Client) { c.storeID = id } }
+// WithStoreID sets the default OpenFGA store ID used by all requests.
+func WithStoreID(id string) Option { return func(c *Client) { c.storeID = id } }
+
+// WithAuthorizationModelID sets the default authorization model ID used by all requests.
 func WithAuthorizationModelID(id string) Option { return func(c *Client) { c.authModelID = id } }
-func WithUserAgent(ua string) Option            { return func(c *Client) { c.userAgent = ua } }
+
+// WithUserAgent overrides the User-Agent header sent on every request.
+func WithUserAgent(ua string) Option { return func(c *Client) { c.userAgent = ua } }
 
 // WithHTTPClient supplies a fully-configured *http.Client (escape hatch). When
 // set, the SDK does not assemble its own transport chain.
@@ -126,7 +132,7 @@ func (c *Client) storeFor(rc *requestConfig) (string, error) {
 		id = c.storeID
 	}
 	if id == "" {
-		return "", &ErrorResponse{Message: "no store ID set; use WithStoreID or WithStore"}
+		return "", errors.New("no store ID set; use WithStoreID or WithStore")
 	}
 	return id, nil
 }

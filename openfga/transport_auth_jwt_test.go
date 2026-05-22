@@ -4,7 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -16,8 +20,8 @@ func TestPrivateKeyJWT_AssertionIsSignedAndParses(t *testing.T) {
 		TokenURL:      "https://issuer.example/oauth/token",
 		ClientID:      "client-123",
 		Audience:      "https://issuer.example/",
-		SigningKey:     key,
-		SigningMethod:  jwt.SigningMethodRS256,
+		SigningKey:    key,
+		SigningMethod: jwt.SigningMethodRS256,
 		KeyID:         "kid-1",
 	}}
 
@@ -56,4 +60,31 @@ func TestWithPrivateKeyJWT_WiresAuthTransport(t *testing.T) {
 	}
 	_ = context.Background
 	_ = url.Values{}
+}
+
+func TestPrivateKeyJWT_TokenReturnsErrorOnNon2xx(t *testing.T) {
+	key, _ := rsa.GenerateKey(rand.Reader, 2048)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprint(w, `{"error":"invalid_client"}`)
+	}))
+	defer srv.Close()
+
+	src := &privateKeyJWTSource{cfg: PrivateKeyJWTConfig{
+		TokenURL:      srv.URL,
+		ClientID:      "client-123",
+		Audience:      srv.URL,
+		SigningKey:    key,
+		SigningMethod: jwt.SigningMethodRS256,
+	}}
+	tok, err := src.Token()
+	if err == nil {
+		t.Fatal("expected error for non-2xx token endpoint response, got nil")
+	}
+	if tok != nil {
+		t.Errorf("expected nil token, got %v", tok)
+	}
+	if !strings.Contains(err.Error(), "401") {
+		t.Errorf("error %q should mention status 401", err.Error())
+	}
 }

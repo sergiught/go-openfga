@@ -50,8 +50,12 @@ func (t *retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Buffer body for replay across attempts.
 	var bodyBytes []byte
 	if req.Body != nil && req.Body != http.NoBody {
-		bodyBytes, _ = io.ReadAll(req.Body)
+		var readErr error
+		bodyBytes, readErr = io.ReadAll(req.Body)
 		_ = req.Body.Close()
+		if readErr != nil {
+			return nil, readErr
+		}
 	}
 
 	max := t.cfg.MaxAttempts
@@ -61,10 +65,12 @@ func (t *retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	var resp *http.Response
 	var err error
 	for attempt := 0; attempt < max; attempt++ {
+		r2 := req.Clone(req.Context())
 		if bodyBytes != nil {
-			req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+			r2.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+			r2.ContentLength = int64(len(bodyBytes))
 		}
-		resp, err = t.base.RoundTrip(req)
+		resp, err = t.base.RoundTrip(r2)
 		if err != nil {
 			return resp, err
 		}

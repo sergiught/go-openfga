@@ -6,6 +6,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -94,11 +96,11 @@ func WithClientCredentials(cfg ClientCredentialsConfig) Option {
 type PrivateKeyJWTConfig struct {
 	TokenURL      string
 	ClientID      string
-	Audience      string           // assertion "aud" (usually the token endpoint/issuer)
-	APIAudience   string           // OpenFGA API audience requested in the grant
+	Audience      string // assertion "aud" (usually the token endpoint/issuer)
+	APIAudience   string // OpenFGA API audience requested in the grant
 	Scopes        []string
-	SigningKey     crypto.PrivateKey // *rsa.PrivateKey or *ecdsa.PrivateKey
-	SigningMethod  jwt.SigningMethod
+	SigningKey    crypto.PrivateKey // *rsa.PrivateKey or *ecdsa.PrivateKey
+	SigningMethod jwt.SigningMethod
 	KeyID         string
 }
 
@@ -156,6 +158,10 @@ func (s *privateKeyJWTSource) Token() (*oauth2.Token, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return nil, fmt.Errorf("openfga: token endpoint returned %d: %s", resp.StatusCode, snippet)
+	}
 	var tr struct {
 		AccessToken string `json:"access_token"`
 		TokenType   string `json:"token_type"`

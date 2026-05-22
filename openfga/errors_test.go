@@ -60,3 +60,34 @@ func TestCheckResponse_TypedStatuses(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckResponse_ErrorsAsReachesBase(t *testing.T) {
+	err := CheckResponse(newHTTPResp(400, `{"code":"validation_error","message":"bad input"}`, ""))
+
+	var ve *ValidationError
+	if !errors.As(err, &ve) {
+		t.Fatalf("want *ValidationError, got %T", err)
+	}
+
+	var base *ErrorResponse
+	if !errors.As(err, &base) {
+		t.Fatal("errors.As did not reach *ErrorResponse through Unwrap")
+	}
+	if base.Code != "validation_error" {
+		t.Errorf("base.Code = %q, want %q", base.Code, "validation_error")
+	}
+	if base.Message != "bad input" {
+		t.Errorf("base.Message = %q, want %q", base.Message, "bad input")
+	}
+}
+
+func TestParseRetryAfter_HTTPDate(t *testing.T) {
+	// Pick a time clearly in the future.
+	future := time.Now().UTC().Add(10 * time.Second)
+	header := future.Format(http.TimeFormat)
+	r := &http.Response{Header: http.Header{"Retry-After": []string{header}}}
+	d := parseRetryAfter(r)
+	if d <= 0 {
+		t.Errorf("expected positive duration for HTTP-date Retry-After, got %v", d)
+	}
+}
