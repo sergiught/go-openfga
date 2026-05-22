@@ -101,7 +101,7 @@ func (c *Client) BareDo(req *http.Request) (*Response, error) {
 		return nil, err
 	}
 	resp := newResponse(httpResp)
-	if err := CheckResponse(httpResp); err != nil {
+	if err := classifyResponse(httpResp); err != nil {
 		httpResp.Body.Close()
 		return resp, err
 	}

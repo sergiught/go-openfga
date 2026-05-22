@@ -64,9 +64,9 @@ type RateLimitError struct {
 // Unwrap allows errors.As to reach the embedded *ErrorResponse.
 func (e *RateLimitError) Unwrap() error { return e.ErrorResponse }
 
-// CheckResponse maps an *http.Response to a typed error, or nil for 2xx.
+// classifyResponse maps an *http.Response to a typed error, or nil for 2xx.
 // It consumes the response body.
-func CheckResponse(r *http.Response) error {
+func classifyResponse(r *http.Response) error {
 	if c := r.StatusCode; c >= 200 && c <= 299 {
 		return nil
 	}

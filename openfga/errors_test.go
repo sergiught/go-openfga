@@ -24,13 +24,13 @@ func newHTTPResp(status int, body, retryAfter string) *http.Response {
 }
 
 func TestCheckResponse_Success(t *testing.T) {
-	if err := CheckResponse(newHTTPResp(200, "", "")); err != nil {
+	if err := classifyResponse(newHTTPResp(200, "", "")); err != nil {
 		t.Fatalf("want nil, got %v", err)
 	}
 }
 
 func TestCheckResponse_RateLimit(t *testing.T) {
-	err := CheckResponse(newHTTPResp(429, `{"code":"rate_limit","message":"slow down"}`, "3"))
+	err := classifyResponse(newHTTPResp(429, `{"code":"rate_limit","message":"slow down"}`, "3"))
 	var rl *RateLimitError
 	if !errors.As(err, &rl) {
 		t.Fatalf("want *RateLimitError, got %T", err)
@@ -54,7 +54,7 @@ func TestCheckResponse_TypedStatuses(t *testing.T) {
 		{500, func(e error) bool { var t *InternalError; return errors.As(e, &t) }},
 	}
 	for _, c := range cases {
-		err := CheckResponse(newHTTPResp(c.status, `{"code":"x","message":"y"}`, ""))
+		err := classifyResponse(newHTTPResp(c.status, `{"code":"x","message":"y"}`, ""))
 		if !c.check(err) {
 			t.Errorf("status %d: wrong error type %T", c.status, err)
 		}
@@ -62,7 +62,7 @@ func TestCheckResponse_TypedStatuses(t *testing.T) {
 }
 
 func TestCheckResponse_ErrorsAsReachesBase(t *testing.T) {
-	err := CheckResponse(newHTTPResp(400, `{"code":"validation_error","message":"bad input"}`, ""))
+	err := classifyResponse(newHTTPResp(400, `{"code":"validation_error","message":"bad input"}`, ""))
 
 	var ve *ValidationError
 	if !errors.As(err, &ve) {
