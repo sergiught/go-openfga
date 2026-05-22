@@ -79,6 +79,91 @@ func TestStoresAll_DoesNotMutateCallerOptions(t *testing.T) {
 	}
 }
 
+func TestAuthorizationModelsAll_Paginates(t *testing.T) {
+	var calls int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		switch r.URL.Query().Get("continuation_token") {
+		case "":
+			_, _ = w.Write([]byte(`{"authorization_models":[{"id":"m1"},{"id":"m2"}],"continuation_token":"p2"}`))
+		case "p2":
+			_, _ = w.Write([]byte(`{"authorization_models":[{"id":"m3"}],"continuation_token":""}`))
+		default:
+			t.Errorf("unexpected token %q", r.URL.Query().Get("continuation_token"))
+		}
+	}))
+	defer srv.Close()
+	c := testClient(t, srv.URL)
+	c.storeID = "s1"
+
+	var ids []string
+	for m, err := range c.AuthorizationModels.All(context.Background(), nil) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, m.ID)
+	}
+	if fmt.Sprint(ids) != "[m1 m2 m3]" {
+		t.Errorf("ids = %v", ids)
+	}
+	if calls != 2 {
+		t.Errorf("calls = %d (want 2)", calls)
+	}
+}
+
+func TestChangesAll_Paginates(t *testing.T) {
+	var calls int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		switch r.URL.Query().Get("continuation_token") {
+		case "":
+			_, _ = w.Write([]byte(`{"changes":[{"tuple_key":{"user":"user:a","relation":"reader","object":"doc:1"},"operation":"TUPLE_OPERATION_WRITE","timestamp":"2024-01-01T00:00:00Z"},{"tuple_key":{"user":"user:b","relation":"reader","object":"doc:2"},"operation":"TUPLE_OPERATION_WRITE","timestamp":"2024-01-01T00:00:00Z"}],"continuation_token":"p2"}`))
+		case "p2":
+			_, _ = w.Write([]byte(`{"changes":[{"tuple_key":{"user":"user:c","relation":"reader","object":"doc:3"},"operation":"TUPLE_OPERATION_DELETE","timestamp":"2024-01-02T00:00:00Z"}],"continuation_token":""}`))
+		default:
+			t.Errorf("unexpected token %q", r.URL.Query().Get("continuation_token"))
+		}
+	}))
+	defer srv.Close()
+	c := testClient(t, srv.URL)
+	c.storeID = "s1"
+
+	var count int
+	for _, err := range c.Tuples.ChangesAll(context.Background(), nil) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		count++
+	}
+	if count != 3 {
+		t.Errorf("count = %d (want 3)", count)
+	}
+	if calls != 2 {
+		t.Errorf("calls = %d (want 2)", calls)
+	}
+}
+
+func TestChangesAll_EarlyBreakStopsFetching(t *testing.T) {
+	var calls int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		_, _ = w.Write([]byte(`{"changes":[{"tuple_key":{"user":"user:a","relation":"reader","object":"doc:1"},"operation":"TUPLE_OPERATION_WRITE","timestamp":"2024-01-01T00:00:00Z"},{"tuple_key":{"user":"user:b","relation":"reader","object":"doc:2"},"operation":"TUPLE_OPERATION_WRITE","timestamp":"2024-01-01T00:00:00Z"}],"continuation_token":"p2"}`))
+	}))
+	defer srv.Close()
+	c := testClient(t, srv.URL)
+	c.storeID = "s1"
+
+	for _, err := range c.Tuples.ChangesAll(context.Background(), nil) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		break
+	}
+	if calls != 1 {
+		t.Errorf("calls = %d (want 1 after break)", calls)
+	}
+}
+
 // TestTuplesReadAll_PropagatesError verifies that when the server returns an
 // error on page 2 the iterator yields a non-nil error and stops.
 func TestTuplesReadAll_PropagatesError(t *testing.T) {
