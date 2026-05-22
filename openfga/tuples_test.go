@@ -109,6 +109,43 @@ func TestTuples_Read_AppliesConsistency(t *testing.T) {
 	}
 }
 
+func TestTuples_Write_DoesNotMutateRequest(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+	c := testClient(t, srv.URL)
+	c.storeID = "s1"
+	c.authModelID = "m1"
+	req := &WriteRequest{
+		Writes: &WriteRequestTuples{TupleKeys: []TupleKey{{User: "user:anne", Relation: "reader", Object: "doc:1"}}},
+	}
+	_, err := c.Tuples.Write(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if req.AuthorizationModelID != "" {
+		t.Errorf("Write mutated req.AuthorizationModelID = %q, want empty", req.AuthorizationModelID)
+	}
+}
+
+func TestTuples_Read_DoesNotMutateRequest(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"tuples":[],"continuation_token":""}`))
+	}))
+	defer srv.Close()
+	c := testClient(t, srv.URL)
+	c.storeID = "s1"
+	req := &ReadRequest{}
+	_, _, err := c.Tuples.Read(context.Background(), req, WithConsistency(ConsistencyHigherConsistency))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if req.Consistency != "" {
+		t.Errorf("Read mutated req.Consistency = %q, want empty", req.Consistency)
+	}
+}
+
 func TestTuples_ReadChanges_QueryParams(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -127,6 +164,9 @@ func TestTuples_ReadChanges_QueryParams(t *testing.T) {
 		if q.Get("continuation_token") != "tok" {
 			t.Errorf("continuation_token = %q, want tok", q.Get("continuation_token"))
 		}
+		if q.Get("start_time") != "2024-01-01T00:00:00Z" {
+			t.Errorf("start_time = %q, want 2024-01-01T00:00:00Z", q.Get("start_time"))
+		}
 		_, _ = w.Write([]byte(`{"changes":[],"continuation_token":"next"}`))
 	}))
 	defer srv.Close()
@@ -136,6 +176,7 @@ func TestTuples_ReadChanges_QueryParams(t *testing.T) {
 		Type:              "document",
 		PageSize:          5,
 		ContinuationToken: "tok",
+		StartTime:         "2024-01-01T00:00:00Z",
 	})
 	if err != nil {
 		t.Fatal(err)

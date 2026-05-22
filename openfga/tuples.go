@@ -17,10 +17,11 @@ func (s *TuplesService) Write(ctx context.Context, req *WriteRequest, opts ...Re
 	if err != nil {
 		return nil, err
 	}
-	if req.AuthorizationModelID == "" {
-		req.AuthorizationModelID = s.client.modelFor(rc)
+	r := *req
+	if r.AuthorizationModelID == "" {
+		r.AuthorizationModelID = s.client.modelFor(rc)
 	}
-	httpReq, err := s.client.newRequest(ctx, http.MethodPost, "/stores/"+store+"/write", req, rc.header)
+	httpReq, err := s.client.newRequest(ctx, http.MethodPost, "/stores/"+store+"/write", &r, rc.header)
 	if err != nil {
 		return nil, err
 	}
@@ -33,14 +34,15 @@ func (s *TuplesService) Write(ctx context.Context, req *WriteRequest, opts ...Re
 func (s *TuplesService) Read(ctx context.Context, req *ReadRequest, opts ...RequestOption) (*ReadResponse, *Response, error) {
 	rc := newRequestConfig()
 	applyOptions(rc, opts)
-	if rc.consistency != "" && req.Consistency == "" {
-		req.Consistency = rc.consistency
+	r := *req
+	if rc.consistency != "" && r.Consistency == "" {
+		r.Consistency = rc.consistency
 	}
 	store, err := s.client.storeFor(rc)
 	if err != nil {
 		return nil, nil, err
 	}
-	httpReq, err := s.client.newRequest(ctx, http.MethodPost, "/stores/"+store+"/read", req, rc.header)
+	httpReq, err := s.client.newRequest(ctx, http.MethodPost, "/stores/"+store+"/read", &r, rc.header)
 	if err != nil {
 		return nil, nil, err
 	}
