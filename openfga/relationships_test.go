@@ -129,3 +129,63 @@ func TestRelationships_ListObjects(t *testing.T) {
 		t.Errorf("body = %+v", gotBody)
 	}
 }
+
+func TestRelationships_Expand(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("want POST, got %s", r.Method)
+		}
+		if r.URL.Path != "/stores/s1/expand" {
+			t.Fatalf("want /stores/s1/expand, got %s", r.URL.Path)
+		}
+		_, _ = w.Write([]byte(`{"tree":{"root":{"name":"doc:1#reader"}}}`))
+	}))
+	defer srv.Close()
+	c := testClient(t, srv.URL)
+	c.storeID = "s1"
+	out, _, err := c.Relationships.Expand(context.Background(), &ExpandRequest{
+		TupleKey: CheckRequestTupleKey{User: "user:anne", Relation: "reader", Object: "doc:1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Tree) == 0 {
+		t.Error("want ExpandResponse.Tree to be populated")
+	}
+}
+
+func TestRelationships_ListUsers(t *testing.T) {
+	var gotBody ListUsersRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("want POST, got %s", r.Method)
+		}
+		if r.URL.Path != "/stores/s1/list-users" {
+			t.Fatalf("want /stores/s1/list-users, got %s", r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"users":[{"object":{"type":"user","id":"anne"}}]}`))
+	}))
+	defer srv.Close()
+	c := testClient(t, srv.URL)
+	c.storeID = "s1"
+	out, _, err := c.Relationships.ListUsers(context.Background(), &ListUsersRequest{
+		Object:      FGAObjectRelation{Object: "doc:1"},
+		Relation:    "reader",
+		UserFilters: []UserTypeFilter{{Type: "user"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Users) != 1 {
+		t.Errorf("users = %v, want 1 element", out.Users)
+	}
+	if gotBody.Relation != "reader" {
+		t.Errorf("body.Relation = %q, want %q", gotBody.Relation, "reader")
+	}
+	if gotBody.Object.Object != "doc:1" {
+		t.Errorf("body.Object.Object = %q, want %q", gotBody.Object.Object, "doc:1")
+	}
+}
