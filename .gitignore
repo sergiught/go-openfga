@@ -1,2 +1,11 @@
 # Local design docs / plans — not committed
 docs/superpowers/
+
+# Tooling binaries installed into ./bin by the Makefile
+/bin/
+
+# Coverage output
+/coverage/
+
+# Local Claude Code settings (machine-specific permissions)
+.claude/settings.local.json
