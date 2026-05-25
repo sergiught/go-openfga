@@ -143,6 +143,42 @@ func TestChangesAll_Paginates(t *testing.T) {
 	}
 }
 
+// TestChangesAll_StopsWhenCaughtUp verifies that the iterator terminates even
+// when the /changes endpoint keeps returning a non-empty continuation token
+// after the changes have been drained. Without this guard the iterator would
+// poll the server forever.
+func TestChangesAll_StopsWhenCaughtUp(t *testing.T) {
+	var calls int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		switch r.URL.Query().Get("continuation_token") {
+		case "":
+			// One real change, plus a token that points past the end.
+			_, _ = w.Write([]byte(`{"changes":[{"tuple_key":{"user":"user:a","relation":"reader","object":"doc:1"},"operation":"TUPLE_OPERATION_WRITE","timestamp":"2024-01-01T00:00:00Z"}],"continuation_token":"tail"}`))
+		default:
+			// Caught up: no changes, but the server still echoes a token.
+			_, _ = w.Write([]byte(`{"changes":[],"continuation_token":"tail"}`))
+		}
+	}))
+	defer srv.Close()
+	c := testClient(t, srv.URL)
+	c.storeID = "s1"
+
+	var count int
+	for _, err := range c.Tuples.ChangesAll(context.Background(), nil) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		count++
+	}
+	if count != 1 {
+		t.Errorf("count = %d (want 1)", count)
+	}
+	if calls != 2 {
+		t.Errorf("calls = %d (want 2: one real page, one empty page)", calls)
+	}
+}
+
 func TestChangesAll_EarlyBreakStopsFetching(t *testing.T) {
 	var calls int
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

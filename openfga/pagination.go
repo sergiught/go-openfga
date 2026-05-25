@@ -88,8 +88,15 @@ func (s *TuplesService) ReadAll(ctx context.Context, req *ReadRequest, ropts ...
 	}
 }
 
-// ChangesAll iterates every tuple change across pages. It copies opts so the
-// caller's struct is never mutated.
+// ChangesAll iterates every tuple change across pages until the feed is caught
+// up. It copies opts so the caller's struct is never mutated.
+//
+// Unlike the other paginated endpoints, the OpenFGA /changes endpoint keeps
+// returning a non-empty continuation token even once there are no more changes,
+// so that callers can resume the feed later. Stopping only on an empty token
+// would therefore loop forever, re-requesting empty pages. To drain the feed
+// exactly once we also stop when a page yields no changes, or when the server
+// hands back the same token we just sent (no forward progress).
 func (s *TuplesService) ChangesAll(ctx context.Context, opts *ReadChangesOptions, ropts ...RequestOption) iter.Seq2[TupleChange, error] {
 	var o ReadChangesOptions
 	if opts != nil {
@@ -97,6 +104,7 @@ func (s *TuplesService) ChangesAll(ctx context.Context, opts *ReadChangesOptions
 	}
 	return func(yield func(TupleChange, error) bool) {
 		for {
+			sentToken := o.ContinuationToken
 			page, _, err := s.ReadChanges(ctx, &o, ropts...)
 			if err != nil {
 				yield(TupleChange{}, err)
@@ -107,7 +115,11 @@ func (s *TuplesService) ChangesAll(ctx context.Context, opts *ReadChangesOptions
 					return
 				}
 			}
-			if page.ContinuationToken == "" {
+			// Caught up: no changes on this page, no further token, or the
+			// token did not advance.
+			if len(page.Changes) == 0 ||
+				page.ContinuationToken == "" ||
+				page.ContinuationToken == sentToken {
 				return
 			}
 			o.ContinuationToken = page.ContinuationToken
