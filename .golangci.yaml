@@ -1,0 +1,73 @@
+version: "2"
+
+run:
+  allow-parallel-runners: true
+
+linters:
+  default: none
+  enable:
+    - bodyclose    # Catches HTTP response bodies that aren't Close()'d (leaks fds + keep-alive slots).
+    - errcheck
+    - errorlint    # Flags %w / errors.Is/As misuse and bare error string comparisons.
+    - gocritic
+    - gocyclo
+    - godot
+    - gosec
+    - nilerr       # Catches `if err != nil { return nil }` — silent error drops.
+    - noctx        # Demands a context.Context on outbound HTTP requests.
+    - nolintlint   # Lints the //nolint directives themselves so unused suppressions get pruned.
+    - revive
+    - staticcheck
+    - unconvert
+    - unused
+    - whitespace
+  settings:
+    gocyclo:
+      min-complexity: 15
+    godot:
+      # Declaration-level doc comments only; trailing inline field annotations
+      # (`Field int // optional`) are left alone.
+      scope: declarations
+      capital: true
+      period: true
+    nolintlint:
+      # Each //nolint must name a specific linter and carry an explanation
+      # comment — both are non-negotiable hygiene.
+      require-specific: true
+      require-explanation: true
+      allow-unused: true
+    staticcheck:
+      checks:
+        - all
+  exclusions:
+    generated: lax
+    rules:
+      # Test code may use http.Get, weak RNG (G404), etc. without ceremony.
+      - linters: [gosec]
+        path: (.+)_test.go
+      # Unit tests build synthetic http.Response values (NopCloser bodies) to
+      # exercise pure helpers like classifyResponse — closing is meaningless.
+      - linters: [bodyclose]
+        path: (.+)_test.go
+      # Style nits we don't want to enforce on every exported identifier.
+      - path: (.+)\.go$
+        text: should have a package comment
+      - path: (.+)\.go$
+        text: unused-parameter
+      # Test files legitimately spin up httptest servers and exercise them
+      # within the same goroutine, so a plumbed context isn't meaningful.
+      - linters: [noctx]
+        path: (.+)_test.go
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    gofmt:
+      simplify: true
+    goimports:
+      local-prefixes:
+        - github.com/sergiught/go-openfga
+  exclusions:
+    generated: lax
