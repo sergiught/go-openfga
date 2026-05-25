@@ -1,0 +1,89 @@
+name: 🐛 Report a bug
+description: A client method returns unexpected results, panics, mis-encodes a request, or otherwise behaves differently than the README or godoc promises.
+labels: ["bug"]
+
+body:
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have read the [README](https://github.com/sergiught/go-openfga/blob/main/README.md) and the [Go reference](https://pkg.go.dev/github.com/sergiught/go-openfga/openfga) and have not found a solution.
+          required: true
+        - label: I have searched the [issues](https://github.com/sergiught/go-openfga/issues) and have not found a duplicate.
+          required: true
+        - label: This is a bug in the client, not in the OpenFGA server or modeling language.
+          required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened, and what did you expect instead? A minimal Go snippet that reproduces the problem is the gold standard.
+      placeholder: |
+        When I call client.Relationships.Check with a contextual tuple, the request body omits the "context" field ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: A small, self-contained Go program (or test) that triggers the bug. Trim it to the smallest thing that still fails.
+      render: go
+      placeholder: |
+        c, _ := openfga.NewClient("https://api.fga.example",
+            openfga.WithStoreID("01H..."),
+            openfga.WithAPIToken("..."))
+        _, _, err := c.Relationships.Check(context.Background(), &openfga.CheckRequest{ /* ... */ })
+        // got: ...
+        // want: ...
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: go-openfga version
+      description: The module version from `go.mod` (e.g. `v0.1.0`) or the commit SHA you're building against.
+    validations:
+      required: true
+
+  - type: input
+    id: go-version
+    attributes:
+      label: Go version
+      description: Output of `go version`.
+      placeholder: go version go1.23.0 linux/amd64
+    validations:
+      required: true
+
+  - type: input
+    id: server-version
+    attributes:
+      label: OpenFGA server version
+      description: The version of the OpenFGA server you're talking to, if known.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: auth
+    attributes:
+      label: Which authentication mode are you using?
+      options:
+        - None (no auth)
+        - Pre-shared API token (WithAPIToken)
+        - OAuth2 client credentials (WithClientCredentials)
+        - Private-key JWT (WithPrivateKeyJWT)
+        - Other / custom transport
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error output or logs
+      description: The full error string, panic stack trace, or relevant log lines. Redact any tokens before pasting.
+      render: shell
+    validations:
+      required: false

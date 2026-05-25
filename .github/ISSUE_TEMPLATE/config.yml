@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 README
+    url: https://github.com/sergiught/go-openfga/blob/main/README.md
+    about: Installation, quickstart, authentication options, and the supported endpoints.
+  - name: 📚 Go reference
+    url: https://pkg.go.dev/github.com/sergiught/go-openfga/openfga
+    about: Full API documentation and runnable examples for every exported symbol.
+  - name: 🐘 OpenFGA docs
+    url: https://openfga.dev/docs
+    about: Questions about the OpenFGA modeling language or server itself (not this client) belong upstream.
+  - name: 💬 Discussions
+    url: https://github.com/sergiught/go-openfga/discussions
+    about: Ask a question, share a use case, or float an idea before opening a formal issue.

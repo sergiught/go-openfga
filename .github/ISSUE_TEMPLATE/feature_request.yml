@@ -1,0 +1,58 @@
+name: 🚀 Feature request
+description: Suggest a new endpoint, option, or quality-of-life improvement for the go-openfga client.
+labels: ["enhancement"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to suggest an improvement!
+
+        Before filing, please skim the [README](https://github.com/sergiught/go-openfga/blob/main/README.md)
+        and the [Go reference](https://pkg.go.dev/github.com/sergiught/go-openfga/openfga) — the capability you
+        want may already exist as a client option or method.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched the [issues](https://github.com/sergiught/go-openfga/issues) and have not found a duplicate or existing discussion.
+          required: true
+        - label: This request is about the Go client (an idiomatic wrapper over the OpenFGA HTTP API), not about the OpenFGA server itself.
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem you're trying to solve
+      description: What's painful or impossible with the client today? What are you trying to build?
+      placeholder: |
+        I want to stream ListObjects results without buffering the whole page, but ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed API
+      description: Sketch the ideal Go API — a new method, a new functional option, a new request field. Even a rough signature helps.
+      render: go
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and current workarounds
+      description: How are you working around this today? What other shapes did you consider?
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Links to the relevant OpenFGA API docs, prior art in other SDKs, or anything else that helps.
+    validations:
+      required: false
