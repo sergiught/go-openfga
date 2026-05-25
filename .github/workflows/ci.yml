@@ -1,0 +1,96 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  # Floor: the minimum Go the module supports (go.mod `go` directive).
+  GO_VERSION: '1.23'
+  GOLANGCI_LINT_VERSION: 'v2.12.2'
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    name: lint (golangci-lint + module drift)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      # golangci/golangci-lint-action v9.2.0
+      - uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          args: -c .golangci.yaml ./...
+      - name: go mod verify
+        run: go mod verify
+      - name: check go.mod / go.sum drift
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+
+  test:
+    name: test (-race, coverage)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The first entry (env.GO_VERSION) is the supported floor; the second
+        # tracks whatever Go upstream currently calls "stable". Catches
+        # toolchain drift in both directions — cheap insurance for a library.
+        go-version: ['1.23', 'stable']
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+      - name: make test-cover
+        run: make test-cover
+      - name: upload coverage to Codecov
+        # Only the floor run uploads; otherwise the matrix double-counts.
+        if: matrix.go-version == '1.23'
+        # codecov/codecov-action v5.1.2
+        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/unit.out
+          flags: unit
+          fail_ci_if_error: false
+
+  integration:
+    name: integration (testcontainers + godog)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        with:
+          # The integration module pins a newer toolchain than the library
+          # floor (testcontainers transitive deps); track stable here.
+          go-version: 'stable'
+          cache: true
+          cache-dependency-path: test/integration/go.sum
+      - name: make integration
+        run: make integration
+
+  vuln:
+    name: govulncheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: make vuln
+        run: make vuln
