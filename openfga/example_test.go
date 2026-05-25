@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/sergiu/go-openfga/openfga"
+	"github.com/sergiught/go-openfga/openfga"
 )
 
 // ExampleNewClient shows how to construct a Client with a store ID and API token.

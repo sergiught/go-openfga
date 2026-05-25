@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/cucumber/godog"
-	"github.com/sergiu/go-openfga/openfga"
+	"github.com/sergiught/go-openfga/openfga"
 )
 
 func registerSteps(sc *godog.ScenarioContext, st *suiteState) {

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/cucumber/godog"
-	"github.com/sergiu/go-openfga/openfga"
+	"github.com/sergiught/go-openfga/openfga"
 )
 
 type suiteState struct {

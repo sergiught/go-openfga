@@ -1,4 +1,4 @@
-module github.com/sergiu/go-openfga
+module github.com/sergiught/go-openfga
 
 go 1.23
 

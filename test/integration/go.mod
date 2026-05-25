@@ -1,10 +1,10 @@
-module github.com/sergiu/go-openfga/test/integration
+module github.com/sergiught/go-openfga/test/integration
 
 go 1.26.3
 
 require (
 	github.com/cucumber/godog v0.14.1
-	github.com/sergiu/go-openfga v0.0.0
+	github.com/sergiught/go-openfga v0.0.0
 	github.com/testcontainers/testcontainers-go v0.33.0
 )
 
@@ -63,4 +63,4 @@ require (
 	golang.org/x/sys v0.21.0 // indirect
 )
 
-replace github.com/sergiu/go-openfga => ../../
+replace github.com/sergiught/go-openfga => ../../
