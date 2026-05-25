@@ -1,5 +1,10 @@
 package openfga
 
+import (
+	"encoding/json"
+	"strings"
+)
+
 // ContextualTupleKeys is a set of tuple keys provided as context for a query.
 // These tuples are treated as if they were already written to the store for
 // the duration of the request.
@@ -87,10 +92,61 @@ type ListObjectsResponse struct {
 }
 
 // FGAObjectRelation identifies an object and an optional relation, used as the
-// target in ListUsersRequest.
+// target in ListUsersRequest. The Object is given in the convenient "type:id"
+// string form; it is serialized to OpenFGA's structured {type, id} object on
+// the wire (see MarshalJSON).
 type FGAObjectRelation struct {
 	Object   string `json:"object,omitempty"`
 	Relation string `json:"relation,omitempty"`
+}
+
+// MarshalJSON encodes the object in the structure OpenFGA's ListUsers endpoint
+// expects: a nested {"type": ..., "id": ...} object split from the "type:id"
+// string form. The optional relation is included only when set.
+func (o FGAObjectRelation) MarshalJSON() ([]byte, error) {
+	typ, id := o.Object, ""
+	if i := strings.IndexByte(o.Object, ':'); i >= 0 {
+		typ, id = o.Object[:i], o.Object[i+1:]
+	}
+	obj := struct {
+		Type string `json:"type,omitempty"`
+		ID   string `json:"id,omitempty"`
+	}{Type: typ, ID: id}
+
+	if o.Relation == "" {
+		return json.Marshal(obj)
+	}
+	return json.Marshal(struct {
+		Type     string `json:"type,omitempty"`
+		ID       string `json:"id,omitempty"`
+		Relation string `json:"relation,omitempty"`
+	}{Type: typ, ID: id, Relation: o.Relation})
+}
+
+// UnmarshalJSON is the inverse of MarshalJSON: it accepts the structured
+// {type, id, relation} object and rebuilds the "type:id" string form. A bare
+// JSON string is also accepted for backward compatibility.
+func (o *FGAObjectRelation) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		o.Object = s
+		return nil
+	}
+	var obj struct {
+		Type     string `json:"type"`
+		ID       string `json:"id"`
+		Relation string `json:"relation"`
+	}
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return err
+	}
+	if obj.ID != "" {
+		o.Object = obj.Type + ":" + obj.ID
+	} else {
+		o.Object = obj.Type
+	}
+	o.Relation = obj.Relation
+	return nil
 }
 
 // UserTypeFilter limits ListUsers results to a specific object type and
