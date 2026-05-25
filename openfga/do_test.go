@@ -2,6 +2,7 @@ package openfga
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -53,9 +54,5 @@ func TestDo_ReturnsTypedErrorOn4xx(t *testing.T) {
 }
 
 func asValidation(err error, target **ValidationError) bool {
-	v, ok := err.(*ValidationError)
-	if ok {
-		*target = v
-	}
-	return ok
+	return errors.As(err, target)
 }

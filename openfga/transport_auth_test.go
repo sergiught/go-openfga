@@ -9,13 +9,13 @@ import (
 )
 
 func TestAPIToken_SetsBearer(t *testing.T) {
-	cap := &captureRT{}
-	rt := wrapAuth((&apiTokenSource{token: "sekret"}).transport(), cap)
+	crt := &captureRT{}
+	rt := wrapAuth((&apiTokenSource{token: "sekret"}).transport(), crt)
 	req, _ := http.NewRequest(http.MethodGet, "https://x/", nil)
 	if _, err := rt.RoundTrip(req); err != nil {
 		t.Fatal(err)
 	}
-	if got := cap.last.Header.Get("Authorization"); got != "Bearer sekret" {
+	if got := crt.last.Header.Get("Authorization"); got != "Bearer sekret" {
 		t.Errorf("authorization = %q", got)
 	}
 }
@@ -47,7 +47,7 @@ func TestWithClientCredentials_SendsBearerToken(t *testing.T) {
 	}))
 	defer apiSrv.Close()
 
-	cap := &captureRT{}
+	crt := &captureRT{}
 	rt := wrapAuth(
 		func() http.RoundTripper {
 			cfg := ClientCredentialsConfig{
@@ -59,17 +59,17 @@ func TestWithClientCredentials_SendsBearerToken(t *testing.T) {
 			WithClientCredentials(cfg)(c)
 			return c.authTransport
 		}(),
-		cap,
+		crt,
 	)
 
 	req, _ := http.NewRequest(http.MethodGet, apiSrv.URL+"/", nil)
 	if _, err := rt.RoundTrip(req); err != nil {
 		t.Fatal(err)
 	}
-	if cap.last == nil {
+	if crt.last == nil {
 		t.Fatal("no request reached base transport")
 	}
-	auth := cap.last.Header.Get("Authorization")
+	auth := crt.last.Header.Get("Authorization")
 	if !strings.HasPrefix(auth, "Bearer ") {
 		t.Fatalf("Authorization = %q, want Bearer token", auth)
 	}

@@ -72,7 +72,7 @@ func classifyResponse(r *http.Response) error {
 	}
 	base := &ErrorResponse{Response: r}
 	if data, _ := io.ReadAll(r.Body); len(data) > 0 {
-		_ = json.Unmarshal(data, base) // best-effort; leave fields empty on failure
+		_ = json.Unmarshal(data, base) // Best-effort; leave fields empty on failure.
 	}
 	switch {
 	case r.StatusCode == http.StatusTooManyRequests:

@@ -66,7 +66,7 @@ func TestPrivateKeyJWT_TokenReturnsErrorOnNon2xx(t *testing.T) {
 	key, _ := rsa.GenerateKey(rand.Reader, 2048)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
-		fmt.Fprint(w, `{"error":"invalid_client"}`)
+		_, _ = fmt.Fprint(w, `{"error":"invalid_client"}`)
 	}))
 	defer srv.Close()
 

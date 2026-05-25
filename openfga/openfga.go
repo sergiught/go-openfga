@@ -18,7 +18,7 @@ type Client struct {
 	storeID     string
 	authModelID string
 
-	// transport-layer config assembled in NewClient
+	// Transport-layer config assembled in NewClient.
 	staticHeaders http.Header
 	authTransport http.RoundTripper
 	retry         *RetryConfig

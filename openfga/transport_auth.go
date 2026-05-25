@@ -32,7 +32,7 @@ func wrapAuth(auth http.RoundTripper, base http.RoundTripper) http.RoundTripper 
 	return auth
 }
 
-// --- pre-shared API token ---
+// Pre-shared API token.
 
 type apiTokenSource struct{ token string }
 
@@ -60,7 +60,7 @@ func WithAPIToken(token string) Option {
 	return func(c *Client) { c.authTransport = (&apiTokenSource{token: token}).transport() }
 }
 
-// --- OAuth2 client credentials ---
+// OAuth2 client credentials.
 
 // ClientCredentialsConfig configures the OAuth2 client-credentials grant.
 type ClientCredentialsConfig struct {
@@ -90,7 +90,7 @@ func WithClientCredentials(cfg ClientCredentialsConfig) Option {
 	}
 }
 
-// --- private-key JWT (RFC 7523 client assertion) ---
+// Private-key JWT (RFC 7523 client assertion).
 
 // PrivateKeyJWTConfig configures client-credentials with a signed JWT assertion.
 type PrivateKeyJWTConfig struct {
@@ -106,6 +106,10 @@ type PrivateKeyJWTConfig struct {
 
 type privateKeyJWTSource struct{ cfg PrivateKeyJWTConfig }
 
+// jwtBearerAssertionType is the RFC 7523 client-assertion type URN, not a
+// credential.
+//
+//nolint:gosec // G101: this is a well-known OAuth2 URN, not a hardcoded secret.
 const jwtBearerAssertionType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 
 // assertionValues builds the token-request form including a freshly signed JWT.
@@ -153,11 +157,16 @@ func (s *privateKeyJWTSource) Token() (*oauth2.Token, error) {
 	if err != nil {
 		return nil, err
 	}
-	resp, err := http.PostForm(s.cfg.TokenURL, values)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, s.cfg.TokenURL, strings.NewReader(values.Encode()))
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 		return nil, fmt.Errorf("openfga: token endpoint returned %d: %s", resp.StatusCode, snippet)

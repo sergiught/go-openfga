@@ -93,7 +93,7 @@ func (s *RelationshipsService) StreamedListObjects(ctx context.Context, req *Lis
 			yield(StreamedListObjectsResponse{}, err)
 			return
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		dec := json.NewDecoder(resp.Body)
 		for dec.More() {
 			var env streamedEnvelope

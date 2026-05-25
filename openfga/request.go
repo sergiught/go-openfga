@@ -102,7 +102,7 @@ func (c *Client) BareDo(req *http.Request) (*Response, error) {
 	}
 	resp := newResponse(httpResp)
 	if err := classifyResponse(httpResp); err != nil {
-		httpResp.Body.Close()
+		_ = httpResp.Body.Close()
 		return resp, err
 	}
 	return resp, nil
@@ -115,7 +115,7 @@ func (c *Client) Do(req *http.Request, v any) (*Response, error) {
 	if err != nil {
 		return resp, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if v == nil {
 		return resp, nil
 	}

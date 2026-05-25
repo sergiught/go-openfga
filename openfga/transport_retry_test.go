@@ -3,6 +3,7 @@ package openfga
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"testing"
@@ -142,7 +143,7 @@ func TestRetry_ContextCancellationReturnsCtxErr(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for cancelled context")
 	}
-	if err != context.Canceled {
+	if !errors.Is(err, context.Canceled) {
 		t.Errorf("err = %v, want context.Canceled", err)
 	}
 }
@@ -176,7 +177,7 @@ func TestRetry_ContextCancelDuringBackoff(t *testing.T) {
 	_, err := rt.RoundTrip(req)
 	elapsed := time.Since(start)
 
-	if err != context.Canceled {
+	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("err = %v, want context.Canceled", err)
 	}
 	if elapsed > 2*time.Second {

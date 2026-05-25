@@ -73,13 +73,13 @@ func (t *retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		}
 	}
 
-	max := t.cfg.MaxAttempts
-	if max < 1 {
-		max = 1
+	maxAttempts := t.cfg.MaxAttempts
+	if maxAttempts < 1 {
+		maxAttempts = 1
 	}
 	var resp *http.Response
 	var err error
-	for attempt := 0; attempt < max; attempt++ {
+	for attempt := 0; attempt < maxAttempts; attempt++ {
 		r2 := req.Clone(req.Context())
 		if bodyBytes != nil {
 			r2.Body = io.NopCloser(bytes.NewReader(bodyBytes))
@@ -89,7 +89,7 @@ func (t *retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		if err != nil {
 			return resp, err
 		}
-		if attempt == max-1 || !t.retryable(resp.StatusCode) {
+		if attempt == maxAttempts-1 || !t.retryable(resp.StatusCode) {
 			return resp, nil
 		}
 		d := t.backoff(attempt, resp)
@@ -128,6 +128,7 @@ func (t *retryTransport) backoff(attempt int, resp *http.Response) time.Duration
 		d = t.cfg.MaxWait
 	}
 	if t.cfg.Jitter && d > 0 {
+		//nolint:gosec // G404: backoff jitter is not security-sensitive; a weak RNG is fine.
 		d = time.Duration(rand.Int63n(int64(d)))
 	}
 	return d
