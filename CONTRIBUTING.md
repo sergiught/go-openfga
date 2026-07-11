@@ -32,7 +32,8 @@ make pre-commit
 
 | Path | What lives there |
 | --- | --- |
-| `openfga/` | The client library — the only package consumers import. |
+| `openfga/` | The client library — the core package consumers import. |
+| `dsl/` | A separate Go module wrapping [`openfga/language`](https://github.com/openfga/language) to convert models between DSL and JSON. It's its own module so that heavy dependency never enters the core client's graph — only projects that import `dsl` pull it in. |
 | `test/integration/` | A separate Go module: a [godog](https://github.com/cucumber/godog) acceptance suite that runs against a real OpenFGA server via [testcontainers](https://golang.testcontainers.org). Its test-only dependencies never enter the client's public dependency graph. |
 
 ## Making a change
@@ -90,6 +91,27 @@ Every PR runs:
 - **pr-title** — Conventional Commits check on the PR title.
 
 All of these must be green before a PR can merge.
+
+## Releasing
+
+[release-please](https://github.com/googleapis/release-please) tracks both modules and
+opens a release PR per module. The core module tags as `vX.Y.Z`; the `dsl` module tags
+as `dsl/vX.Y.Z`.
+
+The two modules depend on each other, so the **first** release of a version `dsl` should
+track needs a specific order — release-please handles version numbers and tags, but not
+the inter-module `require` line:
+
+1. Release the core module first (merge its release PR, producing tag `vX.Y.Z`).
+2. In `dsl/go.mod`, point the require at that real version:
+   `require github.com/sergiught/go-openfga vX.Y.Z` (it ships as `v0.0.0` for local dev).
+3. Release the `dsl` module (producing tag `dsl/vX.Y.Z`).
+
+The `replace github.com/sergiught/go-openfga => ../` in `dsl/go.mod` only affects in-repo
+development — Go ignores `replace` directives in imported dependencies, so it has no effect
+on consumers. What matters downstream is that the `require` names a published core version;
+`v0.0.0` is not resolvable outside the repo. Users then install with
+`go get github.com/sergiught/go-openfga/dsl@dsl/vX.Y.Z`.
 
 ## Reporting bugs and requesting features
 
