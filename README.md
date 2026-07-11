@@ -2,7 +2,7 @@
   <img src="docs/assets/banner.svg" alt="go-openfga — fine-grained authorization for Go, a hand-crafted OpenFGA client" width="100%">
 </p>
 
-# go-openfga
+<h1 align="center">go-openfga</h1>
 
 [![ci](https://github.com/sergiught/go-openfga/actions/workflows/ci.yml/badge.svg)](https://github.com/sergiught/go-openfga/actions/workflows/ci.yml)
 [![codeql](https://github.com/sergiught/go-openfga/actions/workflows/codeql.yml/badge.svg)](https://github.com/sergiught/go-openfga/actions/workflows/codeql.yml)
