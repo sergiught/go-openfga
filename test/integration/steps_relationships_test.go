@@ -2,7 +2,9 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/cucumber/godog"
 	"github.com/sergiught/go-openfga/openfga"
@@ -22,6 +24,8 @@ func registerRelationshipsSteps(sc *godog.ScenarioContext, st *suiteState) {
 	sc.Step(`^the objects do not include "([^"]*)"$`, st.objectsExclude)
 	sc.Step(`^I stream "([^"]*)" objects "([^"]*)" can "([^"]*)"$`, st.streamObjects)
 	sc.Step(`^the streamed objects include "([^"]*)"$`, st.objectsInclude)
+	sc.Step(`^I list users of type "([^"]*)" that can "([^"]*)" "([^"]*)"$`, st.listUsers)
+	sc.Step(`^the users include "([^"]*)"$`, st.usersInclude)
 }
 
 // check performs a Check. Action step: captures error into st.lastErr.
@@ -145,6 +149,40 @@ func (st *suiteState) objectsExclude(object string) error {
 		}
 	}
 	return nil
+}
+
+func (st *suiteState) listUsers(ctx context.Context, typ, relation, object string) error {
+	out, _, err := st.client.Relationships.ListUsers(ctx, &openfga.ListUsersRequest{
+		AuthorizationModelID: st.modelID,
+		Object:               openfga.FGAObjectRelation{Object: object},
+		Relation:             relation,
+		UserFilters:          []openfga.UserTypeFilter{{Type: typ}},
+	})
+	st.lastErr = err
+	if out != nil {
+		st.users = out.Users
+	}
+	return nil
+}
+
+// usersInclude checks the ListUsers result for a "type:id" user by matching the
+// serialized user objects, which OpenFGA returns as {"object":{"type","id"}}.
+func (st *suiteState) usersInclude(want string) error {
+	if st.lastErr != nil {
+		return fmt.Errorf("list users errored: %w", st.lastErr)
+	}
+	typ, id := want, ""
+	if i := strings.IndexByte(want, ':'); i >= 0 {
+		typ, id = want[:i], want[i+1:]
+	}
+	for _, u := range st.users {
+		b, _ := json.Marshal(u)
+		s := string(b)
+		if strings.Contains(s, `"type":"`+typ+`"`) && strings.Contains(s, `"id":"`+id+`"`) {
+			return nil
+		}
+	}
+	return fmt.Errorf("users %v do not include %q", st.users, want)
 }
 
 func (st *suiteState) checkWithContextualTuple(ctx context.Context, user, relation, object, cu, cr, co string) error {

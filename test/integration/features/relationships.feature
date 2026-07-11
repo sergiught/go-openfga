@@ -60,3 +60,8 @@ Feature: Relationship queries against a live OpenFGA server
     Given the tuple "user:anne" "viewer" "document:roadmap" is written
     When I stream "document" objects "user:anne" can "viewer"
     Then the streamed objects include "document:roadmap"
+
+  Scenario: List users returns users who can view a document
+    Given the tuple "user:anne" "viewer" "document:roadmap" is written
+    When I list users of type "user" that can "viewer" "document:roadmap"
+    Then the users include "user:anne"
