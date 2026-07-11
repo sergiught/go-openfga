@@ -31,4 +31,5 @@ type suiteState struct {
 func registerSteps(sc *godog.ScenarioContext, st *suiteState) {
 	registerCommonSteps(sc, st)
 	registerRelationshipsSteps(sc, st)
+	registerStoresSteps(sc, st)
 }
