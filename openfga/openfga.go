@@ -17,6 +17,7 @@ type Client struct {
 
 	storeID     string
 	authModelID string
+	consistency ConsistencyPreference
 
 	// Transport-layer config assembled in NewClient.
 	staticHeaders http.Header
@@ -95,6 +96,12 @@ func WithStoreID(id string) Option { return func(c *Client) { c.storeID = id } }
 // WithAuthorizationModelID sets the default authorization model ID used by all requests.
 func WithAuthorizationModelID(id string) Option { return func(c *Client) { c.authModelID = id } }
 
+// WithDefaultConsistency sets the read consistency applied to all relationship
+// query and tuple read requests. A per-call WithConsistency option overrides it.
+func WithDefaultConsistency(cons ConsistencyPreference) Option {
+	return func(c *Client) { c.consistency = cons }
+}
+
 // WithUserAgent overrides the User-Agent header sent on every request.
 func WithUserAgent(ua string) Option { return func(c *Client) { c.userAgent = ua } }
 
@@ -145,6 +152,14 @@ func (c *Client) modelFor(rc *requestConfig) string {
 		return rc.authModelID
 	}
 	return c.authModelID
+}
+
+// consistencyFor resolves the read consistency for a call (per-call override wins).
+func (c *Client) consistencyFor(rc *requestConfig) ConsistencyPreference {
+	if rc.consistency != "" {
+		return rc.consistency
+	}
+	return c.consistency
 }
 
 // BaseURL returns the API base URL the client targets.

@@ -39,6 +39,29 @@ func TestRelationships_Check(t *testing.T) {
 	}
 }
 
+func TestRelationships_Check_AppliesDefaultConsistency(t *testing.T) {
+	var gotBody CheckRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"allowed":true}`))
+	}))
+	defer srv.Close()
+	c := testClient(t, srv.URL)
+	c.storeID = "s1"
+	c.consistency = ConsistencyHigherConsistency
+	_, _, err := c.Relationships.Check(context.Background(), &CheckRequest{
+		TupleKey: CheckRequestTupleKey{User: "user:anne", Relation: "reader", Object: "doc:1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotBody.Consistency != ConsistencyHigherConsistency {
+		t.Errorf("consistency in body = %q, want %q", gotBody.Consistency, ConsistencyHigherConsistency)
+	}
+}
+
 func TestRelationships_Check_DoesNotMutateRequest(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"allowed":false}`))

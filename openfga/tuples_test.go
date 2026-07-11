@@ -109,6 +109,52 @@ func TestTuples_Read_AppliesConsistency(t *testing.T) {
 	}
 }
 
+func TestTuples_Read_AppliesDefaultConsistency(t *testing.T) {
+	var gotConsistency ConsistencyPreference
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body ReadRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		gotConsistency = body.Consistency
+		_, _ = w.Write([]byte(`{"tuples":[],"continuation_token":""}`))
+	}))
+	defer srv.Close()
+	c := testClient(t, srv.URL)
+	c.storeID = "s1"
+	c.consistency = ConsistencyHigherConsistency
+	_, _, err := c.Tuples.Read(context.Background(), &ReadRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotConsistency != ConsistencyHigherConsistency {
+		t.Errorf("consistency = %q, want %q", gotConsistency, ConsistencyHigherConsistency)
+	}
+}
+
+func TestTuples_Read_PerCallConsistencyOverridesDefault(t *testing.T) {
+	var gotConsistency ConsistencyPreference
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body ReadRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		gotConsistency = body.Consistency
+		_, _ = w.Write([]byte(`{"tuples":[],"continuation_token":""}`))
+	}))
+	defer srv.Close()
+	c := testClient(t, srv.URL)
+	c.storeID = "s1"
+	c.consistency = ConsistencyHigherConsistency
+	_, _, err := c.Tuples.Read(context.Background(), &ReadRequest{}, WithConsistency(ConsistencyMinimizeLatency))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotConsistency != ConsistencyMinimizeLatency {
+		t.Errorf("consistency = %q, want %q", gotConsistency, ConsistencyMinimizeLatency)
+	}
+}
+
 func TestTuples_Write_DoesNotMutateRequest(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{}`))

@@ -16,8 +16,8 @@ func (s *RelationshipsService) fillDefaults(opts []RequestOption, modelID *strin
 	if *modelID == "" {
 		*modelID = s.client.modelFor(rc)
 	}
-	if *cons == "" && rc.consistency != "" {
-		*cons = rc.consistency
+	if *cons == "" {
+		*cons = s.client.consistencyFor(rc)
 	}
 }
 

@@ -35,8 +35,8 @@ func (s *TuplesService) Read(ctx context.Context, req *ReadRequest, opts ...Requ
 	rc := newRequestConfig()
 	applyOptions(rc, opts)
 	r := *req
-	if rc.consistency != "" && r.Consistency == "" {
-		r.Consistency = rc.consistency
+	if r.Consistency == "" {
+		r.Consistency = s.client.consistencyFor(rc)
 	}
 	store, err := s.client.storeFor(rc)
 	if err != nil {
