@@ -29,9 +29,31 @@ type WriteRequest struct {
 	AuthorizationModelID string              `json:"authorization_model_id,omitempty"`
 }
 
-// WriteRequestTuples carries a list of tuple keys for a write or delete operation.
+// OnDuplicate controls how the server handles a write whose tuple already
+// exists. Requires OpenFGA >= 1.10. Empty means the server default ("error").
+type OnDuplicate string
+
+const (
+	OnDuplicateError  OnDuplicate = "error"
+	OnDuplicateIgnore OnDuplicate = "ignore"
+)
+
+// OnMissing controls how the server handles a delete whose tuple does not
+// exist. Requires OpenFGA >= 1.10. Empty means the server default ("error").
+type OnMissing string
+
+const (
+	OnMissingError  OnMissing = "error"
+	OnMissingIgnore OnMissing = "ignore"
+)
+
+// WriteRequestTuples carries a list of tuple keys for a write or delete
+// operation. OnDuplicate is only meaningful on the Writes block; OnMissing is
+// only meaningful on the Deletes block.
 type WriteRequestTuples struct {
-	TupleKeys []TupleKey `json:"tuple_keys"`
+	TupleKeys   []TupleKey  `json:"tuple_keys"`
+	OnDuplicate OnDuplicate `json:"on_duplicate,omitempty"`
+	OnMissing   OnMissing   `json:"on_missing,omitempty"`
 }
 
 // ReadRequestTupleKey is a partial tuple key used as a filter in Read requests.

@@ -234,3 +234,61 @@ func TestTuples_ReadChanges_QueryParams(t *testing.T) {
 		t.Errorf("token = %q, want next", resp.ContinuationToken)
 	}
 }
+
+func TestWrite_ConflictOptionsSerialized(t *testing.T) {
+	var got map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	c, err := NewClient(srv.URL, WithStoreID("store1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.Tuples.Write(context.Background(), &WriteRequest{
+		Writes: &WriteRequestTuples{
+			TupleKeys:   []TupleKey{{User: "user:anne", Relation: "reader", Object: "doc:1"}},
+			OnDuplicate: OnDuplicateIgnore,
+		},
+		Deletes: &WriteRequestTuples{
+			TupleKeys: []TupleKey{{User: "user:bob", Relation: "reader", Object: "doc:2"}},
+			OnMissing: OnMissingIgnore,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	writes := got["writes"].(map[string]any)
+	if writes["on_duplicate"] != "ignore" {
+		t.Fatalf("writes.on_duplicate = %v, want ignore", writes["on_duplicate"])
+	}
+	deletes := got["deletes"].(map[string]any)
+	if deletes["on_missing"] != "ignore" {
+		t.Fatalf("deletes.on_missing = %v, want ignore", deletes["on_missing"])
+	}
+}
+
+func TestWrite_ConflictOptionsOmittedWhenUnset(t *testing.T) {
+	var got map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(srv.URL, WithStoreID("store1"))
+	_, err := c.Tuples.Write(context.Background(), &WriteRequest{
+		Writes: &WriteRequestTuples{TupleKeys: []TupleKey{{User: "user:anne", Relation: "reader", Object: "doc:1"}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	writes := got["writes"].(map[string]any)
+	if _, present := writes["on_duplicate"]; present {
+		t.Fatalf("on_duplicate should be omitted when unset")
+	}
+}
