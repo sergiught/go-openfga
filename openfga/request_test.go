@@ -59,3 +59,24 @@ func TestNewRequest_NilBodyHasNoContentType(t *testing.T) {
 		}
 	}
 }
+
+func TestChunkingOptions_SetConfig(t *testing.T) {
+	rc := newRequestConfig()
+	applyOptions(rc, []RequestOption{
+		WithMaxParallel(7),
+		WithMaxPerChunk(20),
+		WithMaxChecksPerBatch(25),
+		WithTransaction(),
+		WithOnDuplicate(OnDuplicateIgnore),
+		WithOnMissing(OnMissingIgnore),
+	})
+	if rc.maxParallel != 7 || rc.maxPerChunk != 20 || rc.maxChecksPerBatch != 25 {
+		t.Fatalf("chunk sizes not set: %+v", rc)
+	}
+	if !rc.transaction {
+		t.Fatal("transaction not set")
+	}
+	if rc.onDuplicate != OnDuplicateIgnore || rc.onMissing != OnMissingIgnore {
+		t.Fatal("conflict options not set")
+	}
+}

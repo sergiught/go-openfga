@@ -17,6 +17,14 @@ type requestConfig struct {
 	storeID     string
 	authModelID string
 	consistency ConsistencyPreference
+
+	// Bulk/parallel knobs; zero means "use the method default".
+	maxParallel       int
+	maxPerChunk       int
+	maxChecksPerBatch int
+	transaction       bool
+	onDuplicate       OnDuplicate
+	onMissing         OnMissing
 }
 
 func newRequestConfig() *requestConfig { return &requestConfig{header: http.Header{}} }
@@ -131,4 +139,43 @@ func (c *Client) Do(req *http.Request, v any) (*Response, error) {
 		resp.ContinuationToken = ct.continuationToken()
 	}
 	return resp, nil
+}
+
+// WithMaxParallel caps the number of concurrent HTTP requests issued by
+// Tuples.WriteTuples, Tuples.DeleteTuples, and Relationships.BatchCheckAll.
+// Non-positive values fall back to the default (10). Other methods ignore it.
+func WithMaxParallel(n int) RequestOption {
+	return func(rc *requestConfig) { rc.maxParallel = n }
+}
+
+// WithMaxPerChunk sets how many tuples go into each non-transactional request
+// issued by Tuples.WriteTuples / Tuples.DeleteTuples. Non-positive values fall
+// back to the default (1). Ignored by other methods and when WithTransaction is set.
+func WithMaxPerChunk(n int) RequestOption {
+	return func(rc *requestConfig) { rc.maxPerChunk = n }
+}
+
+// WithMaxChecksPerBatch sets how many checks go into each /batch-check request
+// issued by Relationships.BatchCheckAll. Non-positive values fall back to the
+// default (50, the server maximum). Other methods ignore it.
+func WithMaxChecksPerBatch(n int) RequestOption {
+	return func(rc *requestConfig) { rc.maxChecksPerBatch = n }
+}
+
+// WithTransaction makes Tuples.WriteTuples / Tuples.DeleteTuples send a single
+// transactional /write request instead of chunking. Other methods ignore it.
+func WithTransaction() RequestOption {
+	return func(rc *requestConfig) { rc.transaction = true }
+}
+
+// WithOnDuplicate sets the on_duplicate conflict mode on the write requests
+// issued by Tuples.WriteTuples. Other methods ignore it.
+func WithOnDuplicate(v OnDuplicate) RequestOption {
+	return func(rc *requestConfig) { rc.onDuplicate = v }
+}
+
+// WithOnMissing sets the on_missing conflict mode on the delete requests
+// issued by Tuples.DeleteTuples. Other methods ignore it.
+func WithOnMissing(v OnMissing) RequestOption {
+	return func(rc *requestConfig) { rc.onMissing = v }
 }
