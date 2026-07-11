@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 
 	language "github.com/openfga/language/pkg/go/transformer"
+
 	"github.com/sergiught/go-openfga/openfga"
 )
 

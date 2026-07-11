@@ -33,6 +33,7 @@ type WriteRequest struct {
 // exists. Requires OpenFGA >= 1.10. Empty means the server default ("error").
 type OnDuplicate string
 
+// OnDuplicate modes accepted on the Writes block.
 const (
 	OnDuplicateError  OnDuplicate = "error"
 	OnDuplicateIgnore OnDuplicate = "ignore"
@@ -42,6 +43,7 @@ const (
 // exist. Requires OpenFGA >= 1.10. Empty means the server default ("error").
 type OnMissing string
 
+// OnMissing modes accepted on the Deletes block.
 const (
 	OnMissingError  OnMissing = "error"
 	OnMissingIgnore OnMissing = "ignore"
@@ -106,6 +108,7 @@ func (r *ReadChangesResponse) continuationToken() string { return r.Continuation
 // WriteStatus reports the outcome of a single tuple in a bulk write/delete.
 type WriteStatus string
 
+// WriteStatus values for a per-tuple bulk result.
 const (
 	WriteStatusSuccess WriteStatus = "success"
 	WriteStatusFailure WriteStatus = "failure"
