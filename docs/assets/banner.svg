@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" role="img"
+     aria-label="go-openfga — fine-grained authorization for Go, a hand-crafted OpenFGA client">
+  <defs>
+    <!-- wordmark gradient: magenta -> violet -> cyan -->
+    <linearGradient id="wm" x1="0" y1="0" x2="1" y2="0.35">
+      <stop offset="0"    stop-color="#ff2bd6"/>
+      <stop offset="0.5"  stop-color="#8a63ff"/>
+      <stop offset="1"    stop-color="#23e8ff"/>
+    </linearGradient>
+    <!-- edge gradient for the relationship graph -->
+    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff2bd6"/>
+      <stop offset="1" stop-color="#23e8ff"/>
+    </linearGradient>
+    <!-- ambient corner glow -->
+    <radialGradient id="glowR" cx="0.82" cy="0.38" r="0.6">
+      <stop offset="0"   stop-color="#23e8ff" stop-opacity="0.20"/>
+      <stop offset="0.5" stop-color="#8a63ff" stop-opacity="0.06"/>
+      <stop offset="1"   stop-color="#0a0e1a" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowL" cx="0.08" cy="0.55" r="0.5">
+      <stop offset="0" stop-color="#ff2bd6" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#0a0e1a" stop-opacity="0"/>
+    </radialGradient>
+    <!-- vignette -->
+    <radialGradient id="vig" cx="0.5" cy="0.5" r="0.75">
+      <stop offset="0.55" stop-color="#0a0e1a" stop-opacity="0"/>
+      <stop offset="1"    stop-color="#000000" stop-opacity="0.55"/>
+    </radialGradient>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="4"/>
+    </filter>
+    <filter id="softwide" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+  </defs>
+
+  <!-- base -->
+  <rect width="1200" height="300" fill="#0a0e1a"/>
+  <rect width="1200" height="300" fill="url(#glowR)"/>
+  <rect width="1200" height="300" fill="url(#glowL)"/>
+
+  <!-- perspective grid floor -->
+  <g stroke="#23e8ff" stroke-opacity="0.10" stroke-width="1">
+    <!-- converging verticals toward vanishing point (600,150) -->
+    <line x1="-200" y1="300" x2="480" y2="196"/>
+    <line x1="60"   y1="300" x2="520" y2="196"/>
+    <line x1="320"  y1="300" x2="560" y2="196"/>
+    <line x1="600"  y1="300" x2="600" y2="196"/>
+    <line x1="880"  y1="300" x2="640" y2="196"/>
+    <line x1="1140" y1="300" x2="680" y2="196"/>
+    <line x1="1400" y1="300" x2="720" y2="196"/>
+    <!-- receding horizontals -->
+    <line x1="0" y1="300" x2="1200" y2="300"/>
+    <line x1="120" y1="258" x2="1080" y2="258"/>
+    <line x1="215" y1="228" x2="985" y2="228"/>
+    <line x1="285" y1="208" x2="915" y2="208"/>
+  </g>
+
+  <!-- relationship graph motif (ReBAC): nodes joined by typed edges -->
+  <g>
+    <!-- edges (drawn first, under nodes) -->
+    <g stroke="url(#edge)" stroke-width="2" fill="none" filter="url(#soft)" stroke-opacity="0.55">
+      <path d="M885,95 L1075,72"/>
+      <path d="M885,95 L1005,205"/>
+      <path d="M1005,205 L1075,72"/>
+      <path d="M870,205 L885,95"/>
+      <path d="M1075,72 L1150,160"/>
+      <path d="M1005,205 L1150,160"/>
+    </g>
+    <g stroke="url(#edge)" stroke-width="1.5" fill="none" stroke-opacity="0.9">
+      <path d="M885,95 L1075,72"/>
+      <path d="M885,95 L1005,205"/>
+      <path d="M1005,205 L1075,72"/>
+      <path d="M870,205 L885,95"/>
+      <path d="M1075,72 L1150,160"/>
+      <path d="M1005,205 L1150,160"/>
+    </g>
+
+    <!-- typed-relation labels -->
+    <g font-family="ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace"
+       font-size="12" fill="#9fb2c8" fill-opacity="0.85">
+      <text x="978" y="76" text-anchor="middle">owner</text>
+      <text x="922" y="164" text-anchor="middle" transform="rotate(41 922 164)">viewer</text>
+      <text x="1058" y="150" text-anchor="middle" transform="rotate(-58 1058 150)">parent</text>
+    </g>
+
+    <!-- nodes: glow halo, then core, then dot -->
+    <g>
+      <circle cx="885"  cy="95"  r="20" fill="#23e8ff" fill-opacity="0.18" filter="url(#softwide)"/>
+      <circle cx="1075" cy="72"  r="20" fill="#ff2bd6" fill-opacity="0.18" filter="url(#softwide)"/>
+      <circle cx="1005" cy="205" r="20" fill="#8a63ff" fill-opacity="0.18" filter="url(#softwide)"/>
+      <circle cx="870"  cy="205" r="16" fill="#23e8ff" fill-opacity="0.15" filter="url(#softwide)"/>
+      <circle cx="1150" cy="160" r="16" fill="#23e8ff" fill-opacity="0.15" filter="url(#softwide)"/>
+    </g>
+    <g fill="#0a0e1a">
+      <circle cx="885"  cy="95"  r="12" stroke="#23e8ff" stroke-width="2"/>
+      <circle cx="1075" cy="72"  r="12" stroke="#ff2bd6" stroke-width="2"/>
+      <circle cx="1005" cy="205" r="12" stroke="#8a63ff" stroke-width="2"/>
+      <circle cx="870"  cy="205" r="8"  stroke="#23e8ff" stroke-width="1.75"/>
+      <circle cx="1150" cy="160" r="8"  stroke="#23e8ff" stroke-width="1.75"/>
+    </g>
+    <g>
+      <circle cx="885"  cy="95"  r="3.5" fill="#23e8ff"/>
+      <circle cx="1075" cy="72"  r="3.5" fill="#ff2bd6"/>
+      <circle cx="1005" cy="205" r="3.5" fill="#8a63ff"/>
+      <circle cx="870"  cy="205" r="2.5" fill="#23e8ff"/>
+      <circle cx="1150" cy="160" r="2.5" fill="#23e8ff"/>
+    </g>
+  </g>
+
+  <!-- wordmark -->
+  <g font-family="'Segoe UI', 'Helvetica Neue', Arial, system-ui, sans-serif">
+    <text x="72" y="150" font-size="92" font-weight="800" letter-spacing="-2"
+          fill="url(#wm)" filter="url(#soft)" opacity="0.55">go-openfga</text>
+    <text x="72" y="150" font-size="92" font-weight="800" letter-spacing="-2"
+          fill="url(#wm)">go-openfga</text>
+    <!-- tagline (single line, kept clear of the graph motif) -->
+    <text x="75" y="210" font-size="24" font-weight="500" fill="#8fb6c9" letter-spacing="0.3"
+          font-family="ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace">
+      an idiomatic <tspan fill="#c98fd6">OpenFGA</tspan> client for Go
+    </text>
+  </g>
+
+  <!-- vignette on top -->
+  <rect width="1200" height="300" fill="url(#vig)"/>
+</svg>
