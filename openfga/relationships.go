@@ -2,7 +2,11 @@ package openfga
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"iter"
 	"net/http"
 )
@@ -106,4 +110,95 @@ func (s *RelationshipsService) StreamedListObjects(ctx context.Context, req *Lis
 			}
 		}
 	}
+}
+
+// newCorrelationID returns a random 16-byte hex string for auto-populating
+// batch-check items that lack a correlation ID.
+func newCorrelationID() (string, error) {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b[:]), nil
+}
+
+// BatchCheckAll runs many checks by splitting req.Checks into chunks of at most
+// WithMaxChecksPerBatch (default 50, the server maximum) and issuing the native
+// /batch-check requests concurrently (bounded by WithMaxParallel). Results from
+// every chunk are merged into a single map keyed by correlation ID. Items with
+// an empty CorrelationID get a generated one. Duplicate caller-supplied
+// correlation IDs are rejected before any request, since the merged map would
+// collide. Any failing chunk request aborts the call with that error.
+func (s *RelationshipsService) BatchCheckAll(ctx context.Context, req *BatchCheckRequest, opts ...RequestOption) (*BatchCheckResponse, error) {
+	merged := &BatchCheckResponse{Result: map[string]BatchCheckSingleResult{}}
+	if len(req.Checks) == 0 {
+		return merged, nil
+	}
+
+	rc := newRequestConfig()
+	applyOptions(rc, opts)
+	store, err := s.client.storeFor(rc)
+	if err != nil {
+		return nil, err
+	}
+
+	modelID := req.AuthorizationModelID
+	cons := req.Consistency
+	s.fillDefaults(opts, &modelID, &cons)
+
+	// Copy checks, populating/validating correlation IDs.
+	checks := make([]BatchCheckItem, len(req.Checks))
+	seen := make(map[string]struct{}, len(req.Checks))
+	for i, item := range req.Checks {
+		if item.CorrelationID == "" {
+			id, err := newCorrelationID()
+			if err != nil {
+				return nil, err
+			}
+			item.CorrelationID = id
+		} else if _, dup := seen[item.CorrelationID]; dup {
+			return nil, fmt.Errorf("openfga: duplicate correlation_id %q in BatchCheckAll", item.CorrelationID)
+		}
+		seen[item.CorrelationID] = struct{}{}
+		checks[i] = item
+	}
+
+	perBatch := resolvePositive(rc.maxChecksPerBatch, defaultMaxChecksPerBatch)
+	maxPar := resolvePositive(rc.maxParallel, defaultMaxParallel)
+
+	type span struct{ lo, hi int }
+	var spans []span
+	for lo := 0; lo < len(checks); lo += perBatch {
+		hi := lo + perBatch
+		if hi > len(checks) {
+			hi = len(checks)
+		}
+		spans = append(spans, span{lo, hi})
+	}
+
+	chunkResults := make([]BatchCheckResponse, len(spans))
+	errs := runParallel(ctx, len(spans), maxPar, func(i int) error {
+		body := &BatchCheckRequest{
+			Checks:               checks[spans[i].lo:spans[i].hi],
+			AuthorizationModelID: modelID,
+			Consistency:          cons,
+		}
+		httpReq, err := s.client.newRequest(ctx, http.MethodPost, "/stores/"+store+"/batch-check", body, rc.header)
+		if err != nil {
+			return err
+		}
+		if _, err := s.client.Do(httpReq, &chunkResults[i]); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err := errors.Join(errs...); err != nil {
+		return nil, err
+	}
+	for _, cr := range chunkResults {
+		for k, v := range cr.Result {
+			merged.Result[k] = v
+		}
+	}
+	return merged, nil
 }

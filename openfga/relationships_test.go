@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"sync/atomic"
 	"testing"
 )
 
@@ -210,5 +212,94 @@ func TestRelationships_ListUsers(t *testing.T) {
 	}
 	if gotBody.Object.Object != "doc:1" {
 		t.Errorf("body.Object.Object = %q, want %q", gotBody.Object.Object, "doc:1")
+	}
+}
+
+func TestBatchCheckAll_ChunksAndMerges(t *testing.T) {
+	var reqCount int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&reqCount, 1)
+		var body BatchCheckRequest
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		out := BatchCheckResponse{Result: map[string]BatchCheckSingleResult{}}
+		for _, item := range body.Checks {
+			out.Result[item.CorrelationID] = BatchCheckSingleResult{Allowed: item.TupleKey.Object == "doc:yes"}
+		}
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(out)
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(srv.URL, WithStoreID("store1"))
+	var checks []BatchCheckItem
+	for i := 0; i < 5; i++ {
+		obj := "doc:no"
+		if i%2 == 0 {
+			obj = "doc:yes"
+		}
+		checks = append(checks, BatchCheckItem{
+			TupleKey:      CheckRequestTupleKey{User: "user:a", Relation: "reader", Object: obj},
+			CorrelationID: "c" + strconv.Itoa(i),
+		})
+	}
+	resp, err := c.Relationships.BatchCheckAll(context.Background(), &BatchCheckRequest{Checks: checks}, WithMaxChecksPerBatch(2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if atomic.LoadInt32(&reqCount) != 3 { // ceil(5/2)
+		t.Fatalf("request count = %d, want 3", atomic.LoadInt32(&reqCount))
+	}
+	if len(resp.Result) != 5 {
+		t.Fatalf("merged result size = %d, want 5", len(resp.Result))
+	}
+	if !resp.Result["c0"].Allowed || resp.Result["c1"].Allowed {
+		t.Fatal("merged results incorrect")
+	}
+}
+
+func TestBatchCheckAll_GeneratesMissingCorrelationIDs(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body BatchCheckRequest
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		out := BatchCheckResponse{Result: map[string]BatchCheckSingleResult{}}
+		for _, item := range body.Checks {
+			if item.CorrelationID == "" {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			out.Result[item.CorrelationID] = BatchCheckSingleResult{Allowed: true}
+		}
+		_ = json.NewEncoder(w).Encode(out)
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(srv.URL, WithStoreID("store1"))
+	resp, err := c.Relationships.BatchCheckAll(context.Background(), &BatchCheckRequest{Checks: []BatchCheckItem{
+		{TupleKey: CheckRequestTupleKey{User: "user:a", Relation: "reader", Object: "doc:1"}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Result) != 1 {
+		t.Fatalf("want 1 result, got %d", len(resp.Result))
+	}
+}
+
+func TestBatchCheckAll_DuplicateCorrelationIDsError(t *testing.T) {
+	c, _ := NewClient("http://example.invalid", WithStoreID("store1"))
+	_, err := c.Relationships.BatchCheckAll(context.Background(), &BatchCheckRequest{Checks: []BatchCheckItem{
+		{TupleKey: CheckRequestTupleKey{User: "user:a", Relation: "reader", Object: "doc:1"}, CorrelationID: "dup"},
+		{TupleKey: CheckRequestTupleKey{User: "user:b", Relation: "reader", Object: "doc:2"}, CorrelationID: "dup"},
+	}})
+	if err == nil {
+		t.Fatal("expected error on duplicate correlation IDs")
+	}
+}
+
+func TestBatchCheckAll_EmptyChecks(t *testing.T) {
+	c, _ := NewClient("http://example.invalid", WithStoreID("store1"))
+	resp, err := c.Relationships.BatchCheckAll(context.Background(), &BatchCheckRequest{})
+	if err != nil || len(resp.Result) != 0 {
+		t.Fatal("empty checks should return empty result and nil error")
 	}
 }
