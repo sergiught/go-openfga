@@ -18,6 +18,11 @@
   },
   "packageRules": [
     {
+      "description": "Never auto-bump the go directive in go.mod; the support floor is a deliberate, manually-managed compatibility decision",
+      "matchDatasources": ["golang-version"],
+      "enabled": false
+    },
+    {
       "description": "Group all Go minor + patch updates into one PR",
       "matchManagers": ["gomod"],
       "matchUpdateTypes": ["minor", "patch"],
