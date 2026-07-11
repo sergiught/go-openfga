@@ -2,9 +2,15 @@
 
 [![ci](https://github.com/sergiught/go-openfga/actions/workflows/ci.yml/badge.svg)](https://github.com/sergiught/go-openfga/actions/workflows/ci.yml)
 [![codeql](https://github.com/sergiught/go-openfga/actions/workflows/codeql.yml/badge.svg)](https://github.com/sergiught/go-openfga/actions/workflows/codeql.yml)
+[![codecov](https://codecov.io/gh/sergiught/go-openfga/branch/main/graph/badge.svg)](https://codecov.io/gh/sergiught/go-openfga)
 [![Go Reference](https://pkg.go.dev/badge/github.com/sergiught/go-openfga/openfga.svg)](https://pkg.go.dev/github.com/sergiught/go-openfga/openfga)
 [![Go Report Card](https://goreportcard.com/badge/github.com/sergiught/go-openfga)](https://goreportcard.com/report/github.com/sergiught/go-openfga)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/sergiught/go-openfga/badge)](https://securityscorecards.dev/viewer/?uri=github.com/sergiught/go-openfga)
+[![Release](https://img.shields.io/github/v/release/sergiught/go-openfga?sort=semver)](https://github.com/sergiught/go-openfga/releases)
+[![Go version](https://img.shields.io/github/go-mod/go-version/sergiught/go-openfga)](go.mod)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-fa6673.svg)](https://www.conventionalcommits.org)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 A hand-crafted, idiomatic Go client for the [OpenFGA](https://openfga.dev) HTTP API,
 modeled on the design quality of [`google/go-github`](https://github.com/google/go-github).
