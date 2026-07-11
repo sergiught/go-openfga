@@ -40,7 +40,7 @@ authentication, retries, and custom headers are layered as composable
 
 ## Requirements
 
-- Go 1.23 or newer (the client uses range-over-func iterators).
+- Go 1.25 or newer.
 - An OpenFGA server to talk to — see the [OpenFGA docs](https://openfga.dev/docs) to run one.
 
 ## Installation
