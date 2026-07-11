@@ -1,10 +1,13 @@
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="go-openfga — fine-grained authorization for Go, a hand-crafted OpenFGA client" width="100%">
+</p>
+
 # go-openfga
 
 [![ci](https://github.com/sergiught/go-openfga/actions/workflows/ci.yml/badge.svg)](https://github.com/sergiught/go-openfga/actions/workflows/ci.yml)
 [![codeql](https://github.com/sergiught/go-openfga/actions/workflows/codeql.yml/badge.svg)](https://github.com/sergiught/go-openfga/actions/workflows/codeql.yml)
 [![codecov](https://codecov.io/gh/sergiught/go-openfga/branch/main/graph/badge.svg)](https://codecov.io/gh/sergiught/go-openfga)
 [![Go Reference](https://pkg.go.dev/badge/github.com/sergiught/go-openfga/openfga.svg)](https://pkg.go.dev/github.com/sergiught/go-openfga/openfga)
-[![Go Report Card](https://goreportcard.com/badge/github.com/sergiught/go-openfga)](https://goreportcard.com/report/github.com/sergiught/go-openfga)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/sergiught/go-openfga/badge)](https://securityscorecards.dev/viewer/?uri=github.com/sergiught/go-openfga)
 [![Release](https://img.shields.io/github/v/release/sergiught/go-openfga?sort=semver)](https://github.com/sergiught/go-openfga/releases)
 [![Go version](https://img.shields.io/github/go-mod/go-version/sergiught/go-openfga)](go.mod)
