@@ -15,6 +15,9 @@ type suiteState struct {
 	storeID     string
 	lastStoreID string
 
+	secondStoreID string
+	secondModelID string
+
 	allowed bool
 	lastErr error
 
@@ -35,4 +38,5 @@ func registerSteps(sc *godog.ScenarioContext, st *suiteState) {
 	registerModelsSteps(sc, st)
 	registerTuplesSteps(sc, st)
 	registerAssertionsSteps(sc, st)
+	registerOptionsSteps(sc, st)
 }
