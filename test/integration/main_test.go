@@ -8,12 +8,6 @@ import (
 	"github.com/sergiught/go-openfga/openfga"
 )
 
-type suiteState struct {
-	client  *openfga.Client
-	modelID string
-	allowed bool
-}
-
 func TestFeatures(t *testing.T) {
 	ctx := context.Background()
 	baseURL, cleanup := startOpenFGA(ctx, t)
@@ -23,6 +17,7 @@ func TestFeatures(t *testing.T) {
 		ScenarioInitializer: func(sc *godog.ScenarioContext) {
 			st := &suiteState{}
 			sc.Before(func(ctx context.Context, _ *godog.Scenario) (context.Context, error) {
+				*st = suiteState{baseURL: baseURL}
 				c, err := openfga.NewClient(baseURL)
 				st.client = c
 				return ctx, err
