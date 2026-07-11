@@ -36,6 +36,10 @@ authentication, retries, and custom headers are layered as composable
   client-credentials, and private-key JWT (RFC 7523 client assertion).
 - **Auto-paginating iterators** — Go 1.23 range-over-func for stores, models, tuple
   reads and changes, plus manual cursor control when you need it.
+- **Bulk & parallel helpers** — `WriteTuples`/`DeleteTuples` chunk large slices into
+  parallel non-transactional writes with per-tuple results; `BatchCheckAll` fans a
+  check list across parallel batch-check requests.
+- **DSL transformer** — the optional `dsl` module converts models between DSL and JSON.
 - **Streaming** — `StreamedListObjects` yields results from the NDJSON endpoint as they
   arrive.
 - **Configurable retries** — exponential backoff with full jitter, on by default for
@@ -149,6 +153,8 @@ yourself.
 
 ## Writing tuples
 
+A single transactional write (all-or-nothing, capped by the server at ~100 tuples):
+
 ```go
 _, err := client.Tuples.Write(ctx, &openfga.WriteRequest{
 	Writes: &openfga.WriteRequestTuples{
@@ -157,6 +163,85 @@ _, err := client.Tuples.Write(ctx, &openfga.WriteRequest{
 		},
 	},
 })
+```
+
+### Bulk writes and deletes
+
+`WriteTuples` and `DeleteTuples` accept arbitrarily large slices. By default they
+split the input into non-transactional chunks issued in parallel, so one chunk
+failing doesn't roll back the rest. The response reports a per-tuple outcome
+(order matches the input):
+
+```go
+resp, err := client.Tuples.WriteTuples(ctx, keys,
+	openfga.WithMaxPerChunk(20),  // tuples per request (default 1)
+	openfga.WithMaxParallel(10),  // concurrent requests (default 10)
+)
+if err != nil {
+	return err // only set when no request could be issued at all
+}
+for _, r := range resp.Writes {
+	if r.Status == openfga.WriteStatusFailure {
+		fmt.Println("failed:", r.TupleKey, r.Err)
+	}
+}
+```
+
+Pass `openfga.WithTransaction()` to send everything as one transactional request
+instead of chunking.
+
+### Write-conflict handling
+
+On OpenFGA ≥ 1.10 you can tell the server to ignore a write whose tuple already
+exists, or a delete whose tuple is missing, instead of erroring. Set the fields on
+the request block, or use the options on the bulk helpers:
+
+```go
+// On the raw Write request:
+&openfga.WriteRequestTuples{TupleKeys: keys, OnDuplicate: openfga.OnDuplicateIgnore}
+
+// On the bulk helpers:
+client.Tuples.WriteTuples(ctx, keys, openfga.WithOnDuplicate(openfga.OnDuplicateIgnore))
+client.Tuples.DeleteTuples(ctx, keys, openfga.WithOnMissing(openfga.OnMissingIgnore))
+```
+
+## Batch checking
+
+The native `Relationships.BatchCheck` sends up to the server's per-request limit in
+one call. `BatchCheckAll` accepts any number of checks, splits them across parallel
+`/batch-check` requests, and merges the results into one map keyed by correlation
+ID. Items without a `CorrelationID` get one generated automatically:
+
+```go
+resp, err := client.Relationships.BatchCheckAll(ctx, &openfga.BatchCheckRequest{
+	Checks: checks, // any length
+}, openfga.WithMaxChecksPerBatch(50), openfga.WithMaxParallel(10))
+if err != nil {
+	return err
+}
+for id, result := range resp.Result {
+	fmt.Println(id, result.Allowed)
+}
+```
+
+## DSL models
+
+The `dsl` module converts between OpenFGA's DSL syntax and the JSON model types. It
+lives in a separate module so its transformer dependency stays out of the core SDK's
+graph — install it only if you need it:
+
+```bash
+go get github.com/sergiught/go-openfga/dsl
+```
+
+```go
+import "github.com/sergiught/go-openfga/dsl"
+
+// DSL text -> a model you can pass to AuthorizationModels.Write.
+req, err := dsl.ToModel(dslText)
+
+// A model -> DSL text.
+out, err := dsl.ToDSL(model)
 ```
 
 ## Configuration
