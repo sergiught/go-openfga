@@ -34,4 +34,5 @@ func registerSteps(sc *godog.ScenarioContext, st *suiteState) {
 	registerStoresSteps(sc, st)
 	registerModelsSteps(sc, st)
 	registerTuplesSteps(sc, st)
+	registerAssertionsSteps(sc, st)
 }
