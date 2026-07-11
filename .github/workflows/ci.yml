@@ -59,6 +59,9 @@ jobs:
           cache: true
       - name: make test-cover
         run: make test-cover
+      - name: test dsl module
+        working-directory: dsl
+        run: go test ./...
       - name: upload coverage to Codecov
         # Only the floor run uploads; otherwise the matrix double-counts.
         if: matrix.go-version == '1.25.12'
