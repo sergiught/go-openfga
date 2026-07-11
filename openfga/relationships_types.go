@@ -181,3 +181,15 @@ type StreamedListObjectsResponse struct {
 type streamedEnvelope struct {
 	Result StreamedListObjectsResponse `json:"result"`
 }
+
+// ListRelationsRequest is the input to Relationships.ListRelations. It asks
+// which of the candidate Relations the User has on the Object.
+type ListRelationsRequest struct {
+	User                 string
+	Object               string
+	Relations            []string
+	ContextualTuples     *ContextualTupleKeys
+	Context              map[string]any
+	AuthorizationModelID string
+	Consistency          ConsistencyPreference
+}

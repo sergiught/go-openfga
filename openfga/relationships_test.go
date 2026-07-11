@@ -303,3 +303,67 @@ func TestBatchCheckAll_EmptyChecks(t *testing.T) {
 		t.Fatal("empty checks should return empty result and nil error")
 	}
 }
+
+func TestListRelations_ReturnsAllowedInInputOrder(t *testing.T) {
+	var reqCount int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&reqCount, 1)
+		if r.URL.Path != "/stores/s1/batch-check" {
+			t.Fatalf("want /stores/s1/batch-check, got %s", r.URL.Path)
+		}
+		var body BatchCheckRequest
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		out := BatchCheckResponse{Result: map[string]BatchCheckSingleResult{}}
+		for _, item := range body.Checks {
+			if item.CorrelationID != item.TupleKey.Relation {
+				t.Fatalf("correlation id %q != relation %q", item.CorrelationID, item.TupleKey.Relation)
+			}
+			out.Result[item.CorrelationID] = BatchCheckSingleResult{Allowed: item.TupleKey.Relation != "can_delete"}
+		}
+		_ = json.NewEncoder(w).Encode(out)
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(srv.URL, WithStoreID("s1"))
+	got, err := c.Relationships.ListRelations(context.Background(), &ListRelationsRequest{
+		User:      "user:anne",
+		Object:    "document:budget",
+		Relations: []string{"can_view", "can_edit", "can_delete"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if atomic.LoadInt32(&reqCount) != 1 {
+		t.Fatalf("request count = %d, want 1", atomic.LoadInt32(&reqCount))
+	}
+	if len(got) != 2 || got[0] != "can_view" || got[1] != "can_edit" {
+		t.Fatalf("got %v, want [can_view can_edit]", got)
+	}
+}
+
+func TestListRelations_EmptyRelationsNoRequest(t *testing.T) {
+	var reqCount int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&reqCount, 1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+	c, _ := NewClient(srv.URL, WithStoreID("s1"))
+	got, err := c.Relationships.ListRelations(context.Background(), &ListRelationsRequest{
+		User: "user:anne", Object: "document:budget",
+	})
+	if err != nil || len(got) != 0 || atomic.LoadInt32(&reqCount) != 0 {
+		t.Fatalf("empty relations should issue no request; got=%v err=%v reqs=%d", got, err, reqCount)
+	}
+}
+
+func TestListRelations_DuplicateRelationsError(t *testing.T) {
+	c, _ := NewClient("http://example.invalid", WithStoreID("s1"))
+	_, err := c.Relationships.ListRelations(context.Background(), &ListRelationsRequest{
+		User: "user:anne", Object: "document:budget",
+		Relations: []string{"can_view", "can_view"},
+	})
+	if err == nil {
+		t.Fatal("expected error on duplicate relations")
+	}
+}

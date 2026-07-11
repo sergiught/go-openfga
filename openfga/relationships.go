@@ -202,3 +202,46 @@ func (s *RelationshipsService) BatchCheckAll(ctx context.Context, req *BatchChec
 	}
 	return merged, nil
 }
+
+// ListRelations reports which of req.Relations the user has on the object. It
+// issues the checks through BatchCheckAll (one native /batch-check request per
+// chunk, bounded by WithMaxParallel) and returns the allowed relations in the
+// order they were supplied. Duplicate relations are rejected. Because it builds
+// on the native batch-check endpoint, it requires OpenFGA >= 1.8.0.
+func (s *RelationshipsService) ListRelations(ctx context.Context, req *ListRelationsRequest, opts ...RequestOption) ([]string, error) {
+	if len(req.Relations) == 0 {
+		return nil, nil
+	}
+
+	checks := make([]BatchCheckItem, len(req.Relations))
+	seen := make(map[string]struct{}, len(req.Relations))
+	for i, rel := range req.Relations {
+		if _, dup := seen[rel]; dup {
+			return nil, fmt.Errorf("openfga: duplicate relation %q in ListRelations", rel)
+		}
+		seen[rel] = struct{}{}
+		checks[i] = BatchCheckItem{
+			TupleKey:         CheckRequestTupleKey{User: req.User, Relation: rel, Object: req.Object},
+			ContextualTuples: req.ContextualTuples,
+			Context:          req.Context,
+			CorrelationID:    rel,
+		}
+	}
+
+	resp, err := s.BatchCheckAll(ctx, &BatchCheckRequest{
+		Checks:               checks,
+		AuthorizationModelID: req.AuthorizationModelID,
+		Consistency:          req.Consistency,
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	allowed := make([]string, 0, len(req.Relations))
+	for _, rel := range req.Relations {
+		if resp.Result[rel].Allowed {
+			allowed = append(allowed, rel)
+		}
+	}
+	return allowed, nil
+}

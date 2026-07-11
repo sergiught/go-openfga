@@ -38,7 +38,8 @@ authentication, retries, and custom headers are layered as composable
   reads and changes, plus manual cursor control when you need it.
 - **Bulk & parallel helpers** — `WriteTuples`/`DeleteTuples` chunk large slices into
   parallel non-transactional writes with per-tuple results; `BatchCheckAll` fans a
-  check list across parallel batch-check requests.
+  check list across parallel batch-check requests; `ListRelations` reports which
+  relations a user has on an object.
 - **DSL transformer** — the optional `dsl` module converts models between DSL and JSON.
 - **Streaming** — `StreamedListObjects` yields results from the NDJSON endpoint as they
   arrive.
@@ -222,6 +223,20 @@ if err != nil {
 for id, result := range resp.Result {
 	fmt.Println(id, result.Allowed)
 }
+```
+
+`ListRelations` answers "which of these relations does the user have on this
+object?" — useful for deciding which actions to enable in a UI. It runs the
+candidate relations through `BatchCheckAll` and returns the allowed ones, in the
+order supplied:
+
+```go
+allowed, err := client.Relationships.ListRelations(ctx, &openfga.ListRelationsRequest{
+	User:      "user:anne",
+	Object:    "document:budget",
+	Relations: []string{"can_view", "can_edit", "can_delete"},
+})
+// allowed == []string{"can_view", "can_edit"}
 ```
 
 ## DSL models
