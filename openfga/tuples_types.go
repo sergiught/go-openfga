@@ -102,3 +102,26 @@ type ReadChangesResponse struct {
 }
 
 func (r *ReadChangesResponse) continuationToken() string { return r.ContinuationToken }
+
+// WriteStatus reports the outcome of a single tuple in a bulk write/delete.
+type WriteStatus string
+
+const (
+	WriteStatusSuccess WriteStatus = "success"
+	WriteStatusFailure WriteStatus = "failure"
+)
+
+// TupleResult is the per-tuple outcome of Tuples.WriteTuples / DeleteTuples.
+// Err is non-nil exactly when Status is WriteStatusFailure.
+type TupleResult struct {
+	TupleKey TupleKey
+	Status   WriteStatus
+	Err      error
+}
+
+// WriteTuplesResponse aggregates per-tuple outcomes. WriteTuples populates
+// Writes; DeleteTuples populates Deletes.
+type WriteTuplesResponse struct {
+	Writes  []TupleResult
+	Deletes []TupleResult
+}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 )
 
@@ -290,5 +291,123 @@ func TestWrite_ConflictOptionsOmittedWhenUnset(t *testing.T) {
 	writes := got["writes"].(map[string]any)
 	if _, present := writes["on_duplicate"]; present {
 		t.Fatalf("on_duplicate should be omitted when unset")
+	}
+}
+
+func TestWriteTuples_ChunksAndReportsPerTuple(t *testing.T) {
+	var reqCount int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&reqCount, 1)
+		var body struct {
+			Writes struct {
+				TupleKeys []TupleKey `json:"tuple_keys"`
+			} `json:"writes"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		for _, k := range body.Writes.TupleKeys {
+			if k.Object == "doc:bad" {
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(`{"code":"validation_error","message":"bad"}`))
+				return
+			}
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(srv.URL, WithStoreID("store1"))
+	keys := []TupleKey{
+		{User: "user:a", Relation: "reader", Object: "doc:1"},
+		{User: "user:b", Relation: "reader", Object: "doc:bad"},
+		{User: "user:c", Relation: "reader", Object: "doc:3"},
+	}
+	resp, err := c.Tuples.WriteTuples(context.Background(), keys, WithMaxPerChunk(1), WithMaxParallel(2))
+	if err != nil {
+		t.Fatalf("top-level err = %v, want nil for partial failure", err)
+	}
+	if got := atomic.LoadInt32(&reqCount); got != 3 {
+		t.Fatalf("request count = %d, want 3 (one per chunk)", got)
+	}
+	if len(resp.Writes) != 3 {
+		t.Fatalf("len(Writes) = %d, want 3", len(resp.Writes))
+	}
+	if resp.Writes[0].Status != WriteStatusSuccess || resp.Writes[2].Status != WriteStatusSuccess {
+		t.Fatal("chunks 0 and 2 should succeed")
+	}
+	if resp.Writes[1].Status != WriteStatusFailure || resp.Writes[1].Err == nil {
+		t.Fatal("chunk 1 should fail with an error")
+	}
+	if resp.Writes[1].TupleKey.Object != "doc:bad" {
+		t.Fatalf("result order not preserved: %+v", resp.Writes[1])
+	}
+}
+
+func TestWriteTuples_TransactionSendsSingleRequest(t *testing.T) {
+	var reqCount int32
+	var lastBody map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&reqCount, 1)
+		_ = json.NewDecoder(r.Body).Decode(&lastBody)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(srv.URL, WithStoreID("store1"))
+	keys := []TupleKey{
+		{User: "user:a", Relation: "reader", Object: "doc:1"},
+		{User: "user:b", Relation: "reader", Object: "doc:2"},
+	}
+	resp, err := c.Tuples.WriteTuples(context.Background(), keys, WithTransaction())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if atomic.LoadInt32(&reqCount) != 1 {
+		t.Fatal("transaction mode should send exactly one request")
+	}
+	if len(resp.Writes) != 2 || resp.Writes[0].Status != WriteStatusSuccess {
+		t.Fatal("all tuples should be success")
+	}
+}
+
+func TestDeleteTuples_SendsDeletesWithOnMissing(t *testing.T) {
+	var body map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(srv.URL, WithStoreID("store1"))
+	keys := []TupleKey{{User: "user:a", Relation: "reader", Object: "doc:1"}}
+	resp, err := c.Tuples.DeleteTuples(context.Background(), keys, WithTransaction(), WithOnMissing(OnMissingIgnore))
+	if err != nil {
+		t.Fatal(err)
+	}
+	deletes := body["deletes"].(map[string]any)
+	if deletes["on_missing"] != "ignore" {
+		t.Fatalf("deletes.on_missing = %v", deletes["on_missing"])
+	}
+	if _, ok := body["writes"]; ok {
+		t.Fatal("DeleteTuples must not send a writes block")
+	}
+	if len(resp.Deletes) != 1 || len(resp.Writes) != 0 {
+		t.Fatal("DeleteTuples should populate Deletes only")
+	}
+}
+
+func TestWriteTuples_EmptyKeysNoRequest(t *testing.T) {
+	var reqCount int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&reqCount, 1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+	c, _ := NewClient(srv.URL, WithStoreID("store1"))
+	resp, err := c.Tuples.WriteTuples(context.Background(), nil)
+	if err != nil || len(resp.Writes) != 0 || atomic.LoadInt32(&reqCount) != 0 {
+		t.Fatal("empty keys should issue no request and return empty response")
 	}
 }
