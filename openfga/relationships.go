@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"iter"
 	"net/http"
+	"strconv"
 )
 
 // fillDefaults populates modelID and consistency from the client's defaults
@@ -215,6 +216,9 @@ func (s *RelationshipsService) ListRelations(ctx context.Context, req *ListRelat
 
 	checks := make([]BatchCheckItem, len(req.Relations))
 	seen := make(map[string]struct{}, len(req.Relations))
+	// Correlate by positional index, not the relation name: batch-check
+	// constrains correlation IDs to ^[\w\d-]{1,36}$, which a relation name can
+	// violate in length or characters.
 	for i, rel := range req.Relations {
 		if _, dup := seen[rel]; dup {
 			return nil, fmt.Errorf("openfga: duplicate relation %q in ListRelations", rel)
@@ -224,7 +228,7 @@ func (s *RelationshipsService) ListRelations(ctx context.Context, req *ListRelat
 			TupleKey:         CheckRequestTupleKey{User: req.User, Relation: rel, Object: req.Object},
 			ContextualTuples: req.ContextualTuples,
 			Context:          req.Context,
-			CorrelationID:    rel,
+			CorrelationID:    strconv.Itoa(i),
 		}
 	}
 
@@ -238,8 +242,8 @@ func (s *RelationshipsService) ListRelations(ctx context.Context, req *ListRelat
 	}
 
 	allowed := make([]string, 0, len(req.Relations))
-	for _, rel := range req.Relations {
-		if resp.Result[rel].Allowed {
+	for i, rel := range req.Relations {
+		if resp.Result[strconv.Itoa(i)].Allowed {
 			allowed = append(allowed, rel)
 		}
 	}

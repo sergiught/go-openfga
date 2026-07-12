@@ -5,10 +5,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strconv"
 	"sync/atomic"
 	"testing"
 )
+
+// correlationIDPattern mirrors the OpenFGA batch-check correlation ID contract.
+var correlationIDPattern = regexp.MustCompile(`^[\w\d-]{1,36}$`)
 
 func TestRelationships_Check(t *testing.T) {
 	var gotBody CheckRequest
@@ -315,8 +319,10 @@ func TestListRelations_ReturnsAllowedInInputOrder(t *testing.T) {
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		out := BatchCheckResponse{Result: map[string]BatchCheckSingleResult{}}
 		for _, item := range body.Checks {
-			if item.CorrelationID != item.TupleKey.Relation {
-				t.Fatalf("correlation id %q != relation %q", item.CorrelationID, item.TupleKey.Relation)
+			// Correlation IDs must satisfy the server's ^[\w\d-]{1,36}$ contract,
+			// so they cannot simply be the (arbitrary) relation name.
+			if !correlationIDPattern.MatchString(item.CorrelationID) {
+				t.Fatalf("correlation id %q violates ^[\\w\\d-]{1,36}$", item.CorrelationID)
 			}
 			out.Result[item.CorrelationID] = BatchCheckSingleResult{Allowed: item.TupleKey.Relation != "can_delete"}
 		}
