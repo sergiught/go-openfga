@@ -4,16 +4,16 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
-	"strings"
 )
 
 const defaultUserAgent = "go-openfga"
 
 // Client is an OpenFGA API client. Construct it with NewClient.
 type Client struct {
-	client    *http.Client
-	baseURL   *url.URL
-	userAgent string
+	client     *http.Client
+	baseURL    *url.URL
+	rawBaseURL string
+	userAgent  string
 
 	storeID     string
 	authModelID string
@@ -40,26 +40,22 @@ type service struct{ client *Client }
 type Option func(*Client)
 
 // NewClient creates a client targeting apiURL (e.g. "https://api.fga.example").
+// Configuration is layered: environment (FGA_*) first, then apiURL, then options.
 func NewClient(apiURL string, opts ...Option) (*Client, error) {
-	if !strings.HasSuffix(apiURL, "/") {
-		apiURL += "/"
-	}
-	u, err := url.Parse(apiURL)
-	if err != nil {
-		return nil, err
-	}
-	if u.Scheme == "" || u.Host == "" {
-		return nil, errors.New("invalid api url: " + apiURL)
-	}
-
 	c := &Client{
-		baseURL:       u,
 		userAgent:     defaultUserAgent,
 		staticHeaders: http.Header{},
 		retry:         defaultRetryConfig(),
 	}
+	if apiURL != "" {
+		c.rawBaseURL = apiURL
+	}
 	for _, o := range opts {
 		o(c)
+	}
+
+	if err := c.validate(); err != nil {
+		return nil, err
 	}
 
 	if c.auth != nil {
@@ -116,16 +112,9 @@ func WithUserAgent(ua string) Option { return func(c *Client) { c.userAgent = ua
 // client's Transport yourself.
 func WithHTTPClient(hc *http.Client) Option { return func(c *Client) { c.client = hc } }
 
-// WithBaseURL overrides the API base URL after construction-time parsing.
+// WithBaseURL overrides the API base URL (highest precedence).
 func WithBaseURL(raw string) Option {
-	return func(c *Client) {
-		if !strings.HasSuffix(raw, "/") {
-			raw += "/"
-		}
-		if u, err := url.Parse(raw); err == nil {
-			c.baseURL = u
-		}
-	}
+	return func(c *Client) { c.rawBaseURL = raw }
 }
 
 // WithHeaders adds static headers applied to every request.
