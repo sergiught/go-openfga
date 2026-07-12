@@ -141,7 +141,15 @@ func newCorrelationID() (string, error) {
 // every chunk are merged into a single map keyed by correlation ID. Items with
 // an empty CorrelationID get a generated one. Duplicate caller-supplied
 // correlation IDs are rejected before any request, since the merged map would
-// collide. Any failing chunk request aborts the call with that error.
+// collide.
+//
+// Chunk failures do not abort the whole call: results from every chunk that
+// succeeded are still returned in Result, and the errors from the chunks that
+// failed are combined (via errors.Join) into the returned error. A non-nil
+// error therefore means "some checks are missing from Result", not "no results"
+// — mirroring the per-item reporting of Tuples.WriteTuples. Setup failures
+// (no store ID, a duplicate correlation ID, correlation-ID generation) still
+// return a nil response and that error before any request is issued.
 func (s *RelationshipsService) BatchCheckAll(ctx context.Context, req *BatchCheckRequest, opts ...RequestOption) (*BatchCheckResponse, error) {
 	merged := &BatchCheckResponse{Result: map[string]BatchCheckSingleResult{}}
 	if len(req.Checks) == 0 {
@@ -205,15 +213,12 @@ func (s *RelationshipsService) BatchCheckAll(ctx context.Context, req *BatchChec
 		}
 		return nil
 	})
-	if err := errors.Join(errs...); err != nil {
-		return nil, err
-	}
 	for _, cr := range chunkResults {
 		for k, v := range cr.Result {
 			merged.Result[k] = v
 		}
 	}
-	return merged, nil
+	return merged, errors.Join(errs...)
 }
 
 // ListRelations reports which of req.Relations the user has on the object. It
