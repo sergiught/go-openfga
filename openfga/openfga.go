@@ -2,13 +2,37 @@ package openfga
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
+	"runtime/debug"
+	"strings"
 
 	"github.com/sergiught/go-openfga/internal/config"
 )
 
-const defaultUserAgent = "go-openfga"
+// modulePath is this module's import path, used to find its version in build info.
+const modulePath = "github.com/sergiught/go-openfga"
+
+// defaultUserAgent is the User-Agent sent when the caller does not override it.
+// It embeds the module version recorded in the consuming binary's build info
+// (e.g. "go-openfga/1.2.0"), falling back to the bare name when no version is
+// available (local builds, replace directives, or running the SDK's own tests).
+var defaultUserAgent = buildUserAgent()
+
+func buildUserAgent() string {
+	const name = "go-openfga"
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return name
+	}
+	for _, dep := range info.Deps {
+		if dep.Path == modulePath && dep.Version != "" && dep.Version != "(devel)" {
+			return name + "/" + strings.TrimPrefix(dep.Version, "v")
+		}
+	}
+	return name
+}
 
 // Client is an OpenFGA API client. Construct it with NewClient.
 type Client struct {
@@ -246,6 +270,45 @@ func (c *Client) consistencyFor(rc *requestConfig) ConsistencyPreference {
 	}
 	return c.consistency
 }
+
+// StoreID returns the client's default store ID (empty if unset).
+func (c *Client) StoreID() string { return c.storeID }
+
+// SetStoreID updates the client's default store ID, validating it as a ULID
+// (an empty string clears it). Intended for reconfiguring a client between
+// requests; it is not safe to call concurrently with in-flight requests. Use
+// the per-call WithStore option for concurrent overrides.
+func (c *Client) SetStoreID(id string) error {
+	if id != "" && !ulidRE.MatchString(id) {
+		return fmt.Errorf("openfga: invalid store ID %q: not a ULID", id)
+	}
+	c.storeID = id
+	return nil
+}
+
+// AuthorizationModelID returns the client's default authorization model ID
+// (empty if unset).
+func (c *Client) AuthorizationModelID() string { return c.authModelID }
+
+// SetAuthorizationModelID updates the client's default authorization model ID,
+// validating it as a ULID (an empty string clears it). Same concurrency caveat
+// as SetStoreID; use the per-call WithAuthorizationModel option for concurrent
+// overrides.
+func (c *Client) SetAuthorizationModelID(id string) error {
+	if id != "" && !ulidRE.MatchString(id) {
+		return fmt.Errorf("openfga: invalid authorization model ID %q: not a ULID", id)
+	}
+	c.authModelID = id
+	return nil
+}
+
+// DefaultConsistency returns the client's default read consistency.
+func (c *Client) DefaultConsistency() ConsistencyPreference { return c.consistency }
+
+// SetDefaultConsistency updates the client's default read consistency. Same
+// concurrency caveat as SetStoreID; use the per-call WithConsistency option for
+// concurrent overrides.
+func (c *Client) SetDefaultConsistency(cons ConsistencyPreference) { c.consistency = cons }
 
 // BaseURL returns the API base URL the client targets.
 func (c *Client) BaseURL() string { return c.baseURL.String() }
