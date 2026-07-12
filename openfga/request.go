@@ -78,9 +78,11 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body any, 
 			return nil, err
 		}
 	}
-	var reqBody io.ReadCloser = http.NoBody
+	// Pass the *bytes.Buffer directly (not wrapped) so net/http populates
+	// req.GetBody, which the retry transport uses to replay the body per attempt.
+	var reqBody io.Reader
 	if buf != nil {
-		reqBody = io.NopCloser(buf)
+		reqBody = buf
 	}
 	req, err := http.NewRequestWithContext(ctx, method, u.String(), reqBody)
 	if err != nil {

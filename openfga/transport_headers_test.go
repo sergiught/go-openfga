@@ -26,6 +26,21 @@ func TestHeaderTransport_AddsHeaders(t *testing.T) {
 	}
 }
 
+func TestHeaderTransport_SendsAllValuesForMultiValueHeader(t *testing.T) {
+	crt := &captureRT{}
+	h := http.Header{}
+	h.Add("X-Multi", "one")
+	h.Add("X-Multi", "two")
+	rt := &headerTransport{base: crt, header: h}
+	req, _ := http.NewRequest(http.MethodGet, "https://x/", nil)
+	if _, err := rt.RoundTrip(req); err != nil {
+		t.Fatal(err)
+	}
+	if got := crt.last.Header["X-Multi"]; len(got) != 2 || got[0] != "one" || got[1] != "two" {
+		t.Errorf("X-Multi = %v, want [one two]", got)
+	}
+}
+
 func TestHeaderTransport_PerRequestHeaderTakesPrecedence(t *testing.T) {
 	crt := &captureRT{}
 	static := http.Header{}

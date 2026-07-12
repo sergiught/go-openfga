@@ -58,32 +58,50 @@ func defaultWait(ctx context.Context, d time.Duration) error {
 }
 
 func (t *retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	waitFn := t.wait
-	if waitFn == nil {
-		waitFn = defaultWait
-	}
-	// Buffer body for replay across attempts.
-	var bodyBytes []byte
-	if req.Body != nil && req.Body != http.NoBody {
-		var readErr error
-		bodyBytes, readErr = io.ReadAll(req.Body)
-		_ = req.Body.Close()
-		if readErr != nil {
-			return nil, readErr
-		}
-	}
-
 	maxAttempts := t.cfg.MaxAttempts
 	if maxAttempts < 1 {
 		maxAttempts = 1
 	}
+	// No retries possible: pass through without buffering the body.
+	if maxAttempts == 1 {
+		return t.base.RoundTrip(req)
+	}
+
+	waitFn := t.wait
+	if waitFn == nil {
+		waitFn = defaultWait
+	}
+
+	// getBody reconstructs the request body for each attempt. Prefer the
+	// stdlib-provided GetBody (no extra copy); fall back to buffering once when
+	// it is absent.
+	getBody := req.GetBody
+	if req.Body != nil && req.Body != http.NoBody {
+		if getBody == nil {
+			bodyBytes, readErr := io.ReadAll(req.Body)
+			_ = req.Body.Close()
+			if readErr != nil {
+				return nil, readErr
+			}
+			getBody = func() (io.ReadCloser, error) {
+				return io.NopCloser(bytes.NewReader(bodyBytes)), nil
+			}
+		} else {
+			// We reconstruct via GetBody; the original body is not consumed.
+			_ = req.Body.Close()
+		}
+	}
+
 	var resp *http.Response
 	var err error
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		r2 := req.Clone(req.Context())
-		if bodyBytes != nil {
-			r2.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-			r2.ContentLength = int64(len(bodyBytes))
+		if getBody != nil {
+			body, berr := getBody()
+			if berr != nil {
+				return nil, berr
+			}
+			r2.Body = body
 		}
 		resp, err = t.base.RoundTrip(r2)
 		if err != nil {
@@ -116,6 +134,11 @@ func (t *retryTransport) retryable(status int) bool {
 func (t *retryTransport) backoff(attempt int, resp *http.Response) time.Duration {
 	if t.cfg.HonorRetryAfter {
 		if ra := parseRetryAfter(resp); ra > 0 {
+			// Clamp to MaxWait so a hostile or misconfigured server cannot pin
+			// the client asleep for an unbounded interval.
+			if t.cfg.MaxWait > 0 && ra > t.cfg.MaxWait {
+				return t.cfg.MaxWait
+			}
 			return ra
 		}
 	}
