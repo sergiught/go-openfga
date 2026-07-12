@@ -112,12 +112,25 @@ func classifyResponse(r *http.Response) error {
 	}
 }
 
+// maxRetryAfterSeconds caps a numeric Retry-After so the conversion to a
+// nanosecond time.Duration cannot overflow int64 (~292 years).
+const maxRetryAfterSeconds = 100 * 365 * 24 * 60 * 60
+
 func parseRetryAfter(r *http.Response) time.Duration {
 	v := r.Header.Get("Retry-After")
 	if v == "" {
 		return 0
 	}
 	if secs, err := strconv.Atoi(v); err == nil {
+		if secs <= 0 {
+			return 0
+		}
+		// Clamp before multiplying so a huge value cannot overflow the int64
+		// nanosecond duration into a negative wait. The ceiling (100 years) is
+		// far beyond any real Retry-After; callers clamp it to MaxWait anyway.
+		if secs > maxRetryAfterSeconds {
+			secs = maxRetryAfterSeconds
+		}
 		return time.Duration(secs) * time.Second
 	}
 	if t, err := http.ParseTime(v); err == nil {
