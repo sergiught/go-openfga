@@ -53,7 +53,7 @@ func TestModels_List_WithQueryParams(t *testing.T) {
 	defer srv.Close()
 	c := testClient(t, srv.URL)
 	c.storeID = "s1"
-	page, resp, err := c.AuthorizationModels.List(context.Background(), &ReadModelsOptions{PageSize: 5, ContinuationToken: "tok"})
+	page, resp, err := c.AuthorizationModels.List(context.Background(), &ListModelsOptions{PageSize: 5, ContinuationToken: "tok"})
 	if err != nil {
 		t.Fatal(err)
 	}

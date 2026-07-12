@@ -36,8 +36,8 @@ func (s *StoresService) All(ctx context.Context, opts *ListStoresOptions, ropts 
 
 // All iterates every authorization model across pages. It copies opts so the
 // caller's struct is never mutated.
-func (s *AuthorizationModelsService) All(ctx context.Context, opts *ReadModelsOptions, ropts ...RequestOption) iter.Seq2[AuthorizationModel, error] {
-	var o ReadModelsOptions
+func (s *AuthorizationModelsService) All(ctx context.Context, opts *ListModelsOptions, ropts ...RequestOption) iter.Seq2[AuthorizationModel, error] {
+	var o ListModelsOptions
 	if opts != nil {
 		o = *opts
 	}

@@ -38,7 +38,7 @@ func (st *suiteState) readLatestModel(ctx context.Context) error {
 }
 
 func (st *suiteState) listAllModels(ctx context.Context) error {
-	for m, err := range st.client.AuthorizationModels.All(ctx, &openfga.ReadModelsOptions{PageSize: 1}) {
+	for m, err := range st.client.AuthorizationModels.All(ctx, &openfga.ListModelsOptions{PageSize: 1}) {
 		if err != nil {
 			return err
 		}

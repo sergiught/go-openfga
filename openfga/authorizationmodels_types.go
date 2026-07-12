@@ -27,21 +27,21 @@ type WriteAuthorizationModelResponse struct {
 	AuthorizationModelID string `json:"authorization_model_id"`
 }
 
-// ReadModelsOptions controls pagination for the List method.
-type ReadModelsOptions struct {
+// ListModelsOptions controls pagination for the List method.
+type ListModelsOptions struct {
 	PageSize          int
 	ContinuationToken string
 }
 
-// ReadAuthorizationModelsResponse is a page of authorization models returned by List.
-type ReadAuthorizationModelsResponse struct {
+// ListAuthorizationModelsResponse is a page of authorization models returned by List.
+type ListAuthorizationModelsResponse struct {
 	AuthorizationModels []AuthorizationModel `json:"authorization_models"`
 	ContinuationToken   string               `json:"continuation_token"`
 }
 
-func (r *ReadAuthorizationModelsResponse) continuationToken() string { return r.ContinuationToken }
+func (r *ListAuthorizationModelsResponse) continuationToken() string { return r.ContinuationToken }
 
-// ReadAuthorizationModelResponse wraps a single model returned by Get.
-type ReadAuthorizationModelResponse struct {
+// readAuthorizationModelResponse wraps a single model returned by Get.
+type readAuthorizationModelResponse struct {
 	AuthorizationModel AuthorizationModel `json:"authorization_model"`
 }

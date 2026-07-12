@@ -26,7 +26,7 @@ func (s *AuthorizationModelsService) Write(ctx context.Context, req *WriteAuthor
 }
 
 // List returns a page of authorization models for the store.
-func (s *AuthorizationModelsService) List(ctx context.Context, opts *ReadModelsOptions, ropts ...RequestOption) (*ReadAuthorizationModelsResponse, *Response, error) {
+func (s *AuthorizationModelsService) List(ctx context.Context, opts *ListModelsOptions, ropts ...RequestOption) (*ListAuthorizationModelsResponse, *Response, error) {
 	rc := newRequestConfig()
 	applyOptions(rc, ropts)
 	store, err := s.client.storeFor(rc)
@@ -50,7 +50,7 @@ func (s *AuthorizationModelsService) List(ctx context.Context, opts *ReadModelsO
 	if err != nil {
 		return nil, nil, err
 	}
-	out := new(ReadAuthorizationModelsResponse)
+	out := new(ListAuthorizationModelsResponse)
 	resp, err := s.client.Do(httpReq, out)
 	return out, resp, err
 }
@@ -67,7 +67,7 @@ func (s *AuthorizationModelsService) Get(ctx context.Context, id string, opts ..
 	if err != nil {
 		return nil, nil, err
 	}
-	out := new(ReadAuthorizationModelResponse)
+	out := new(readAuthorizationModelResponse)
 	resp, err := s.client.Do(httpReq, out)
 	if err != nil {
 		return nil, resp, err
@@ -78,7 +78,7 @@ func (s *AuthorizationModelsService) Get(ctx context.Context, id string, opts ..
 // ReadLatest returns the most recently created authorization model by fetching
 // one page of size 1. It returns an error if no models exist in the store.
 func (s *AuthorizationModelsService) ReadLatest(ctx context.Context, opts ...RequestOption) (*AuthorizationModel, *Response, error) {
-	page, resp, err := s.List(ctx, &ReadModelsOptions{PageSize: 1}, opts...)
+	page, resp, err := s.List(ctx, &ListModelsOptions{PageSize: 1}, opts...)
 	if err != nil {
 		return nil, resp, err
 	}
