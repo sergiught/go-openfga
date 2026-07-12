@@ -31,7 +31,7 @@
 //
 // Relationships.Allowed is the shortcut for the most common query:
 //
-//	ok, _, err := c.Relationships.Allowed(ctx, "user:anne", "reader", "document:budget")
+//	ok, err := c.Relationships.Allowed(ctx, "user:anne", "reader", "document:budget")
 //
 // NewTupleKey and NewCheckRequest build the request structs with less ceremony.
 //

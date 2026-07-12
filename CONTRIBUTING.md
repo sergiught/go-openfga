@@ -103,8 +103,10 @@ track needs a specific order — release-please handles version numbers and tags
 the inter-module `require` line:
 
 1. Release the core module first (merge its release PR, producing tag `vX.Y.Z`).
-2. In `dsl/go.mod`, point the require at that real version:
-   `require github.com/sergiught/go-openfga vX.Y.Z` (it ships as `v0.0.0` for local dev).
+2. Pin `dsl`'s require at that real version with `make pin-dsl-core VERSION=vX.Y.Z`
+   (it ships as `v0.0.0` for local dev). Optionally run `make verify-dsl-release`
+   to prove `dsl` resolves and builds against the published core version with the
+   in-repo `replace` dropped. Commit the `dsl/go.mod` change.
 3. Release the `dsl` module (producing tag `dsl/vX.Y.Z`).
 
 The `replace github.com/sergiught/go-openfga => ../` in `dsl/go.mod` only affects in-repo

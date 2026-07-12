@@ -1,0 +1,39 @@
+name: fuzz
+
+# Time-boxed fuzzing of the openfga package's Fuzz* targets. Plain `go test`
+# only replays the seed corpus, so actual fuzzing (`-fuzz`) never runs on
+# push/PR. This nightly job exercises the targets for real; a discovered crash
+# fails the run and the reproducing input is printed in the job log.
+#
+# Trigger manually (with a longer soak) via the Actions tab → Run workflow.
+
+on:
+  schedule:
+    - cron: '0 4 * * *' # nightly 04:00 UTC
+  workflow_dispatch:
+    inputs:
+      fuzztime:
+        description: 'Duration per fuzz target (e.g. 60s, 5m, 1h)'
+        required: false
+        default: '3m'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fuzz-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  fuzz:
+    name: fuzz (openfga)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: 'stable'
+          cache: true
+      - name: make fuzz
+        run: make fuzz FUZZTIME=${{ github.event.inputs.fuzztime || '3m' }}

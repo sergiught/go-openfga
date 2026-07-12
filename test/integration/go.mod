@@ -1,6 +1,6 @@
 module github.com/sergiught/go-openfga/test/integration
 
-go 1.26.3
+go 1.25.0
 
 require (
 	github.com/cucumber/godog v0.15.1

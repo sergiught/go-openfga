@@ -8,8 +8,8 @@ package openfga
 // you can author with either.
 
 // Userset is a relation's rewrite rule. Exactly one field is set. Use the
-// builder helpers (This, ComputedUserset, TupleToUserset, Union, Intersection,
-// Difference) rather than populating the fields by hand.
+// builder helpers (This, ComputedUserset, TupleTo, Union, Intersection,
+// Exclusion) rather than populating the fields by hand.
 type Userset struct {
 	This            *DirectUserset  `json:"this,omitempty"`
 	ComputedUserset *ObjectRelation `json:"computedUserset,omitempty"`

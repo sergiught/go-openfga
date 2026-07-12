@@ -51,6 +51,18 @@ integration: ## Run the testcontainers + godog integration suite (requires Docke
 	@echo "==> Running integration suite (test/integration)"
 	@cd test/integration && go test -count=1 -v ./...
 
+# FUZZTIME bounds each target (go test -fuzz runs one target at a time, so we
+# loop). Override for a longer local soak, e.g. `make fuzz FUZZTIME=5m`.
+FUZZTIME ?= 60s
+FUZZ_TARGETS = FuzzClassifyResponse FuzzFGAObjectRelationCodec FuzzStreamedEnvelopeDecode FuzzParseRetryAfter
+
+.PHONY: fuzz
+fuzz: ## Run each fuzz target for FUZZTIME (default 60s; e.g. make fuzz FUZZTIME=5m)
+	@for t in $(FUZZ_TARGETS); do \
+		echo "==> Fuzzing $$t for $(FUZZTIME)"; \
+		go test ./openfga/ -run '^$$' -fuzz="^$$t$$" -fuzztime=$(FUZZTIME) || exit 1; \
+	done
+
 #-----------------------------------------------------------------------------------------------------------------------
 # Lint & security (golangci-lint, commitlint, govulncheck)
 #-----------------------------------------------------------------------------------------------------------------------
@@ -75,6 +87,36 @@ vuln: $(BINARIES_DIR)/govulncheck ## Scan the root, dsl and integration module g
 	@cd dsl && $(BINARIES_DIR)/govulncheck ./...
 	@echo "==> Scanning test/integration module graph for known Go vulnerabilities"
 	@cd test/integration && $(BINARIES_DIR)/govulncheck ./...
+
+#-----------------------------------------------------------------------------------------------------------------------
+# Release (cross-module version pinning for the dsl module)
+#-----------------------------------------------------------------------------------------------------------------------
+# The dsl module requires the core module. For local dev it resolves it via the
+# `replace => ../` directive (ignored by consumers), so the require version is
+# cosmetic in-repo. At release time the require MUST name a *published* core
+# version, or `go get .../dsl` fails to resolve it. These targets automate that
+# one edit — see the "Releasing" section of CONTRIBUTING.md.
+CORE_MODULE = github.com/sergiught/go-openfga
+
+.PHONY: pin-dsl-core
+pin-dsl-core: ## Pin dsl's require on the core module to VERSION (e.g. make pin-dsl-core VERSION=v0.1.0)
+	@test -n "$(VERSION)" || { echo "VERSION is required, e.g. make pin-dsl-core VERSION=v0.1.0"; exit 1; }
+	@echo "$(VERSION)" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$$' \
+		|| { echo "VERSION must be a semver tag like v0.1.0, got '$(VERSION)'"; exit 1; }
+	@echo "==> Pinning dsl require $(CORE_MODULE)@$(VERSION)"
+	@cd dsl && go mod edit -require=$(CORE_MODULE)@$(VERSION) && go mod tidy
+	@echo "==> Done. Review & commit dsl/go.mod, then tag dsl/$(VERSION)."
+
+.PHONY: verify-dsl-release
+verify-dsl-release: ## Prove dsl resolves & builds against its pinned *published* core version (drops the in-repo replace; needs network)
+	@echo "==> Verifying dsl builds without the in-repo replace directive"
+	@tmp=$$(mktemp -d); cp -a dsl/. "$$tmp"; \
+		if ( cd "$$tmp" && go mod edit -dropreplace=$(CORE_MODULE) && go mod tidy && go build ./... ); then \
+			echo "==> OK: dsl resolves & builds against $(CORE_MODULE) as published"; rm -rf "$$tmp"; \
+		else \
+			echo "==> FAILED: dsl does not build without the replace — is its required core version published?"; \
+			rm -rf "$$tmp"; exit 1; \
+		fi
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Housekeeping (formatting + module hygiene + git hooks)

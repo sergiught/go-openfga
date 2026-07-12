@@ -165,6 +165,107 @@ func Example_errorHandling() {
 	}
 }
 
+// ExampleAuthorizationModelsService_Write authors a model in Go with the typed
+// builder helpers, writes it, and adopts the returned model ID as the client
+// default. The builders map to the DSL: This is `[...]`, ComputedUserset is a
+// bare relation, and Union is `or`.
+func ExampleAuthorizationModelsService_Write() {
+	client, err := openfga.NewClient(
+		"https://api.fga.example",
+		openfga.WithStoreID("01ARZ3NDEKTSV4RRFFQ69G5FAV"),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	req := &openfga.WriteAuthorizationModelRequest{
+		SchemaVersion: "1.1",
+		TypeDefinitions: []openfga.TypeDefinition{
+			{Type: "user"},
+			{
+				Type: "document",
+				Relations: map[string]openfga.Userset{
+					"owner":  openfga.This(),
+					"editor": openfga.Union(openfga.This(), openfga.ComputedUserset("owner")),
+					"viewer": openfga.Union(openfga.This(), openfga.ComputedUserset("editor")),
+				},
+				Metadata: &openfga.Metadata{
+					Relations: map[string]openfga.RelationMetadata{
+						"owner":  {DirectlyRelatedUserTypes: []openfga.RelationReference{openfga.DirectType("user")}},
+						"editor": {DirectlyRelatedUserTypes: []openfga.RelationReference{openfga.DirectType("user")}},
+						"viewer": {DirectlyRelatedUserTypes: []openfga.RelationReference{openfga.DirectType("user")}},
+					},
+				},
+			},
+		},
+	}
+
+	resp, err := client.AuthorizationModels.Write(context.Background(), req)
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	_ = client.SetAuthorizationModelID(resp.AuthorizationModelID)
+	fmt.Println("wrote model:", resp.AuthorizationModelID)
+}
+
+// ExampleAssertionsService_Write records assertions that pin the expected Check
+// outcome for a model, so a model change that breaks them is caught early.
+func ExampleAssertionsService_Write() {
+	client, err := openfga.NewClient(
+		"https://api.fga.example",
+		openfga.WithStoreID("01ARZ3NDEKTSV4RRFFQ69G5FAV"),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	modelID := "01HXAAAAAAAAAAAAAAAAAAAAAA"
+	err = client.Assertions.Write(context.Background(), modelID, &openfga.WriteAssertionsRequest{
+		Assertions: []openfga.Assertion{
+			{
+				TupleKey:    openfga.CheckRequestTupleKey{User: "user:anne", Relation: "viewer", Object: "document:budget"},
+				Expectation: true,
+			},
+			{
+				TupleKey:    openfga.CheckRequestTupleKey{User: "user:bob", Relation: "owner", Object: "document:budget"},
+				Expectation: false,
+			},
+		},
+	})
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	fmt.Println("assertions written")
+}
+
+// ExampleRelationshipsService_StreamedListObjects ranges over the NDJSON
+// streaming endpoint, receiving objects as they arrive instead of buffering a
+// whole page. The second loop value is an error that must be checked.
+func ExampleRelationshipsService_StreamedListObjects() {
+	client, err := openfga.NewClient(
+		"https://api.fga.example",
+		openfga.WithStoreID("01ARZ3NDEKTSV4RRFFQ69G5FAV"),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	req := &openfga.ListObjectsRequest{
+		Type:     "document",
+		Relation: "viewer",
+		User:     "user:anne",
+	}
+	for obj, err := range client.Relationships.StreamedListObjects(context.Background(), req) {
+		if err != nil {
+			fmt.Println("error:", err)
+			return
+		}
+		fmt.Println(obj.Object)
+	}
+}
+
 // ExampleNewClientFromEnv builds a client from FGA_* environment variables,
 // with explicit options overriding the environment.
 func ExampleNewClientFromEnv() {

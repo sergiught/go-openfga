@@ -494,6 +494,29 @@ Per-call options override client defaults for a single request:
 `WithAuthorizationModelID`/`WithAuthorizationModel`,
 `WithDefaultConsistency`/`WithConsistency`.)
 
+### Retries
+
+Retries are on by default: 3 attempts, exponential backoff with equal jitter
+between 1s and 30s, honoring the server's `Retry-After`. By default only
+**HTTP 429** and transient network failures (connection resets, refused dials,
+timeouts) are retried.
+
+**5xx responses are not retried by default.** This is deliberate — a 5xx on a
+non-idempotent write is ambiguous, so blindly retrying it risks duplicating the
+effect. (Note this differs from the official `openfga/go-sdk`, which retries 5xx
+out of the box; if you are migrating and want that behavior, opt in explicitly.)
+Add the statuses you want to `RetryableStatus`:
+
+```go
+openfga.WithRetry(openfga.RetryConfig{
+	RetryableStatus: []int{429, 500, 502, 503, 504},
+})
+```
+
+`WithRetry` merges with the defaults, so setting one field (e.g. `MaxAttempts`)
+keeps the rest. Use `WithoutRetry()` to disable retries entirely. The whole call
+— across every retry — is bounded by the context deadline you pass in.
+
 <p align="right"><sub><a href="#-table-of-contents">↑ Back to table of contents</a></sub></p>
 
 ## 🚨 Error handling
