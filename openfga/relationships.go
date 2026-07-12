@@ -36,6 +36,18 @@ func (s *RelationshipsService) Check(ctx context.Context, req *CheckRequest, opt
 	return out, resp, err
 }
 
+// Allowed is a convenience wrapper over Check for the common case: it reports
+// whether user has relation on object, using the client's default authorization
+// model and consistency. For contextual tuples, ABAC context, or a per-call
+// model, build a CheckRequest and call Check.
+func (s *RelationshipsService) Allowed(ctx context.Context, user, relation, object string, opts ...RequestOption) (bool, *Response, error) {
+	res, resp, err := s.Check(ctx, NewCheckRequest(user, relation, object), opts...)
+	if err != nil {
+		return false, resp, err
+	}
+	return res.Allowed, resp, nil
+}
+
 // BatchCheck runs multiple relationship checks in a single request. Results in
 // BatchCheckResponse.Result are keyed by the CorrelationID of each item.
 func (s *RelationshipsService) BatchCheck(ctx context.Context, req *BatchCheckRequest, opts ...RequestOption) (*BatchCheckResponse, *Response, error) {

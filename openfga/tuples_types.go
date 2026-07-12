@@ -16,6 +16,13 @@ type TupleKey struct {
 	Condition *RelationshipCondition `json:"condition,omitempty"`
 }
 
+// NewTupleKey builds a TupleKey from the three required fields, e.g.
+// NewTupleKey("user:anne", "reader", "document:budget"). Set Condition on the
+// result for ABAC.
+func NewTupleKey(user, relation, object string) TupleKey {
+	return TupleKey{User: user, Relation: relation, Object: object}
+}
+
 // Tuple is a stored relationship triple with a server-assigned timestamp.
 type Tuple struct {
 	Key       TupleKey  `json:"key"`

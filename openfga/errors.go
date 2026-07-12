@@ -9,11 +9,33 @@ import (
 	"time"
 )
 
+// OpenFGA error codes carried in ErrorResponse.Code. This is not the full set
+// the server may return; match on ErrorResponse.Code directly for others. See
+// https://openfga.dev/api/service for the authoritative list.
+const (
+	CodeValidationError            = "validation_error"
+	CodeInvalidAuthorizationModel  = "invalid_authorization_model"
+	CodeTypeNotFound               = "type_not_found"
+	CodeRelationNotFound           = "relation_not_found"
+	CodeStoreIDInvalidLength       = "store_id_invalid_length"
+	CodeAuthorizationModelNotFound = "authorization_model_not_found"
+	CodeInternalError              = "internal_error"
+)
+
 // ErrorResponse is the base error returned for any non-2xx API response.
 type ErrorResponse struct {
 	Response *http.Response `json:"-"`
 	Code     string         `json:"code"`
 	Message  string         `json:"message"`
+}
+
+// RequestID returns the OpenFGA request correlation ID from the response
+// headers, or "" if absent. Quote it when reporting a server-side error.
+func (e *ErrorResponse) RequestID() string {
+	if e.Response == nil {
+		return ""
+	}
+	return e.Response.Header.Get(requestIDHeader)
 }
 
 func (e *ErrorResponse) Error() string {

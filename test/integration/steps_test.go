@@ -22,7 +22,7 @@ type suiteState struct {
 	lastErr error
 
 	objects    []string
-	users      []map[string]any
+	users      []openfga.User
 	tuples     []openfga.Tuple
 	changes    []openfga.TupleChange
 	expand     *openfga.ExpandResponse

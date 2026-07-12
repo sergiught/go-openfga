@@ -29,6 +29,15 @@ type CheckRequest struct {
 	Consistency          ConsistencyPreference `json:"consistency,omitempty"`
 }
 
+// NewCheckRequest builds a CheckRequest for the common case of checking whether
+// user has relation on object. Set the remaining fields (ContextualTuples,
+// Context, AuthorizationModelID, Consistency) on the result as needed.
+func NewCheckRequest(user, relation, object string) *CheckRequest {
+	return &CheckRequest{
+		TupleKey: CheckRequestTupleKey{User: user, Relation: relation, Object: object},
+	}
+}
+
 // CheckResponse is returned by Relationships.Check.
 type CheckResponse struct {
 	Allowed    bool   `json:"allowed"`
@@ -65,7 +74,9 @@ type BatchCheckResponse struct {
 // ExpandRequest is the body for Relationships.Expand.
 type ExpandRequest struct {
 	TupleKey             CheckRequestTupleKey  `json:"tuple_key"`
+	ContextualTuples     *ContextualTupleKeys  `json:"contextual_tuples,omitempty"`
 	AuthorizationModelID string                `json:"authorization_model_id,omitempty"`
+	Context              map[string]any        `json:"context,omitempty"`
 	Consistency          ConsistencyPreference `json:"consistency,omitempty"`
 }
 
@@ -169,7 +180,35 @@ type ListUsersRequest struct {
 
 // ListUsersResponse is returned by Relationships.ListUsers.
 type ListUsersResponse struct {
-	Users []map[string]any `json:"users"`
+	Users []User `json:"users"`
+}
+
+// User is one entry in a ListUsersResponse. Exactly one of Object, Userset, or
+// Wildcard is non-nil, identifying a concrete object, a userset, or a
+// type-bound wildcard (e.g. user:*) respectively.
+type User struct {
+	Object   *FGAObject     `json:"object,omitempty"`
+	Userset  *UsersetUser   `json:"userset,omitempty"`
+	Wildcard *TypedWildcard `json:"wildcard,omitempty"`
+}
+
+// FGAObject is a concrete object reference, e.g. {Type: "user", ID: "anne"}.
+type FGAObject struct {
+	Type string `json:"type"`
+	ID   string `json:"id"`
+}
+
+// UsersetUser references every user related to an object by a relation, e.g.
+// the members of team:eng ({Type: "team", ID: "eng", Relation: "member"}).
+type UsersetUser struct {
+	Type     string `json:"type"`
+	ID       string `json:"id"`
+	Relation string `json:"relation"`
+}
+
+// TypedWildcard matches every user of a type, e.g. user:* ({Type: "user"}).
+type TypedWildcard struct {
+	Type string `json:"type"`
 }
 
 // StreamedListObjectsResponse is one NDJSON line of the streaming response.
