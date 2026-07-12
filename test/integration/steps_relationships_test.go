@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/cucumber/godog"
+
 	"github.com/sergiught/go-openfga/openfga"
 )
 

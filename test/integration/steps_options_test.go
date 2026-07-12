@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/cucumber/godog"
+
 	"github.com/sergiught/go-openfga/openfga"
 )
 
@@ -87,7 +88,7 @@ func (st *suiteState) failsNoStore() error {
 		return fmt.Errorf("expected a no-store-ID error, got nil")
 	}
 	if !strings.Contains(st.lastErr.Error(), "no store ID") {
-		return fmt.Errorf("expected a no-store-ID error, got: %v", st.lastErr)
+		return fmt.Errorf("expected a no-store-ID error, got: %w", st.lastErr)
 	}
 	return nil
 }

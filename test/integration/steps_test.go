@@ -2,6 +2,7 @@ package integration
 
 import (
 	"github.com/cucumber/godog"
+
 	"github.com/sergiught/go-openfga/openfga"
 )
 

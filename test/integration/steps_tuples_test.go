@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/cucumber/godog"
+
 	"github.com/sergiught/go-openfga/openfga"
 )
 
@@ -75,7 +76,7 @@ func (st *suiteState) assertBulk(results []openfga.TupleResult) error {
 	}
 	for _, r := range results {
 		if r.Status != openfga.WriteStatusSuccess {
-			return fmt.Errorf("tuple %+v: status %q err %v", r.TupleKey, r.Status, r.Err)
+			return fmt.Errorf("tuple %+v: status %q err %w", r.TupleKey, r.Status, r.Err)
 		}
 	}
 	return nil

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/cucumber/godog"
+
 	"github.com/sergiught/go-openfga/openfga"
 )
 
@@ -70,7 +71,7 @@ func (st *suiteState) resultDenied() error {
 func (st *suiteState) failsValidation() error {
 	var target *openfga.ValidationError
 	if !errors.As(st.lastErr, &target) {
-		return fmt.Errorf("expected a validation error, got: %v", st.lastErr)
+		return fmt.Errorf("expected a validation error, got: %w", st.lastErr)
 	}
 	return nil
 }
@@ -78,7 +79,7 @@ func (st *suiteState) failsValidation() error {
 func (st *suiteState) failsNotFound() error {
 	var target *openfga.NotFoundError
 	if !errors.As(st.lastErr, &target) {
-		return fmt.Errorf("expected a not found error, got: %v", st.lastErr)
+		return fmt.Errorf("expected a not found error, got: %w", st.lastErr)
 	}
 	return nil
 }

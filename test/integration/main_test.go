@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/cucumber/godog"
+
 	"github.com/sergiught/go-openfga/openfga"
 )
 
