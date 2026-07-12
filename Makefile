@@ -55,18 +55,24 @@ integration: ## Run the testcontainers + godog integration suite (requires Docke
 # Lint & security (golangci-lint, commitlint, govulncheck)
 #-----------------------------------------------------------------------------------------------------------------------
 .PHONY: lint
-lint: $(BINARIES_DIR)/golangci-lint ## Run golangci-lint over the project (with --fix)
+lint: $(BINARIES_DIR)/golangci-lint ## Run golangci-lint over every module (with --fix)
 	@echo "==> Running golangci-lint"
 	@$(BINARIES_DIR)/golangci-lint run --fix -c .golangci.yaml ./...
+	@echo "==> Running golangci-lint (dsl)"
+	@cd dsl && $(BINARIES_DIR)/golangci-lint run --fix -c $(CURDIR)/.golangci.yaml ./...
+	@echo "==> Running golangci-lint (test/integration)"
+	@cd test/integration && $(BINARIES_DIR)/golangci-lint run --fix -c $(CURDIR)/.golangci.yaml ./...
 
 .PHONY: lint-commits
 lint-commits: $(BINARIES_DIR)/commitlint ## Lint the current commit message against commitlint.yaml
 	@$(BINARIES_DIR)/commitlint lint
 
 .PHONY: vuln
-vuln: $(BINARIES_DIR)/govulncheck ## Scan the module graph for known Go vulnerabilities
+vuln: $(BINARIES_DIR)/govulncheck ## Scan the root and dsl module graphs for known Go vulnerabilities
 	@echo "==> Scanning module graph for known Go vulnerabilities"
 	@$(BINARIES_DIR)/govulncheck ./...
+	@echo "==> Scanning dsl module graph for known Go vulnerabilities"
+	@cd dsl && $(BINARIES_DIR)/govulncheck ./...
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Housekeeping (formatting + module hygiene + git hooks)
@@ -76,8 +82,9 @@ fmt: ## Format all Go sources with gofmt -s
 	@gofmt -s -w .
 
 .PHONY: tidy
-tidy: ## Tidy the module graph for the root and integration modules
+tidy: ## Tidy the module graph for the root, dsl and integration modules
 	@go mod tidy
+	@cd dsl && go mod tidy
 	@cd test/integration && go mod tidy
 
 .PHONY: pre-commit

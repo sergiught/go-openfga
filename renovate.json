@@ -18,7 +18,8 @@
   },
   "packageRules": [
     {
-      "description": "Never auto-bump the go directive in go.mod; the support floor is a deliberate, manually-managed compatibility decision",
+      "description": "Never auto-bump the go directive in go.mod; the support floor is a deliberate, manually-managed compatibility decision. Scoped to gomod so the CI toolchain pin (GO_VERSION, tracked via customManagers) can still update",
+      "matchManagers": ["gomod"],
       "matchDatasources": ["golang-version"],
       "enabled": false
     },
@@ -42,6 +43,37 @@
       "matchUpdateTypes": ["major"],
       "labels": ["dependencies", "major-bump"],
       "automerge": false
+    }
+  ],
+  "customManagers": [
+    {
+      "description": "Track the SHA-pinned Go tools installed via `go install ...@<sha> # <version>` in the Makefile",
+      "customType": "regex",
+      "managerFilePatterns": ["/^Makefile$/"],
+      "matchStrings": [
+        "go install (?<depName>\\S+?)(?:/cmd/\\S+?)?@(?<currentDigest>[a-f0-9]{40}) # (?<currentValue>v\\S+)"
+      ],
+      "datasourceTemplate": "go"
+    },
+    {
+      "description": "Track the GO_VERSION toolchain pin in the CI workflows",
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.github/workflows/.+\\.ya?ml$/"],
+      "matchStrings": [
+        "GO_VERSION:\\s*'(?<currentValue>\\S+)'"
+      ],
+      "datasourceTemplate": "golang-version",
+      "depNameTemplate": "go"
+    },
+    {
+      "description": "Track the GOLANGCI_LINT_VERSION pin in ci.yml",
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.github/workflows/ci\\.yml$/"],
+      "matchStrings": [
+        "GOLANGCI_LINT_VERSION:\\s*'(?<currentValue>\\S+)'"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "golangci/golangci-lint"
     }
   ],
   "postUpdateOptions": ["gomodTidy"],

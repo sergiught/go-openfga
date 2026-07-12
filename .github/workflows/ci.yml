@@ -34,19 +34,63 @@ jobs:
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           args: -c .golangci.yaml ./...
+      # The dsl and test/integration modules have their own go.mod, so `./...`
+      # from the root never descends into them. Lint each separately; the
+      # shared config lives at the repo root, hence the absolute -c path.
+      - name: golangci-lint (dsl)
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          working-directory: dsl
+          args: -c ${{ github.workspace }}/.golangci.yaml ./...
+      - name: golangci-lint (test/integration)
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          working-directory: test/integration
+          args: -c ${{ github.workspace }}/.golangci.yaml ./...
       - name: go mod verify
         run: go mod verify
       - name: check go.mod / go.sum drift
+        # Each module carries its own go.mod/go.sum; tidy them all and fail on
+        # any drift so a stale checksum can't sneak into a nested module.
         run: |
-          go mod tidy
-          git diff --exit-code go.mod go.sum
+          for mod in . dsl test/integration; do
+            (cd "$mod" && go mod tidy)
+          done
+          git diff --exit-code \
+            go.mod go.sum \
+            dsl/go.mod dsl/go.sum \
+            test/integration/go.mod test/integration/go.sum
+      - name: check dsl replace directive
+        # dsl/go.mod requires the core module at v0.0.0, resolved in-repo via a
+        # `replace`. release-please never rewrites that require, so without the
+        # replace a dsl release would ship pointing at the unpublished v0.0.0.
+        # Fail if the require is present without an active replace covering it.
+        run: |
+          set -euo pipefail
+          require=$(cd dsl && go mod edit -json | \
+            jq -r '.Require[]? | select(.Path=="github.com/sergiught/go-openfga") | .Version')
+          if [ -n "$require" ]; then
+            replace=$(cd dsl && go mod edit -json | \
+              jq -r '.Replace[]? | select(.Old.Path=="github.com/sergiught/go-openfga") | .New.Path')
+            if [ -z "$replace" ]; then
+              echo "::error::dsl/go.mod requires github.com/sergiught/go-openfga@${require} with no active replace directive"
+              exit 1
+            fi
+          fi
 
   test:
     name: test (-race, coverage)
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        # Pure unit tests only — the testcontainers suite lives in the separate
+        # `integration` job below and stays Linux-only. These run cross-OS to
+        # catch platform-specific regressions in a library consumers embed
+        # anywhere.
+        os: [ubuntu-latest, macos-latest, windows-latest]
         # The first entry (env.GO_VERSION) is the supported floor; the second
         # tracks whatever Go upstream currently calls "stable". Catches
         # toolchain drift in both directions — cheap insurance for a library.
@@ -57,14 +101,21 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
           cache: true
-      - name: make test-cover
-        run: make test-cover
+      - name: unit tests (-race, coverage)
+        # Invoke `go test` directly rather than `make test-cover`: make is not
+        # present on the Windows runner, whereas the go toolchain is identical
+        # across all three OSes. Mirrors the make target's flags.
+        shell: bash
+        run: |
+          mkdir -p coverage
+          go test -race -count=1 -coverprofile=coverage/unit.out -covermode=atomic ./...
       - name: test dsl module
         working-directory: dsl
-        run: go test ./...
+        shell: bash
+        run: go test -race -count=1 ./...
       - name: upload coverage to Codecov
-        # Only the floor run uploads; otherwise the matrix double-counts.
-        if: matrix.go-version == '1.25.12'
+        # Only the floor run on Linux uploads; otherwise the matrix double-counts.
+        if: matrix.go-version == '1.25.12' && matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
