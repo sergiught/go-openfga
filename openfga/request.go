@@ -127,6 +127,8 @@ func (c *Client) Do(req *http.Request, v any) (*Response, error) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if v == nil {
+		// Drain the body so the connection can be reused (keep-alive).
+		_, _ = io.Copy(io.Discard, resp.Body)
 		return resp, nil
 	}
 	if w, ok := v.(io.Writer); ok {
