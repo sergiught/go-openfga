@@ -42,30 +42,19 @@ type service struct{ client *Client }
 type Option func(*Client)
 
 // NewClient creates a client targeting apiURL (e.g. "https://api.fga.example").
-// Configuration is layered lowest-to-highest: environment (FGA_*), then apiURL,
-// then functional options — expressed as the order they are applied below.
+// Construction is explicit: apiURL and opts are the only inputs, applied in
+// order so later opts win. It does not read the environment — use
+// NewClientFromEnv or EnvOptions to opt into FGA_* configuration.
 func NewClient(apiURL string, opts ...Option) (*Client, error) {
-	envCfg, err := config.Load()
-	if err != nil {
-		return nil, err
-	}
-	envOpts, err := configOptions(envCfg)
-	if err != nil {
-		return nil, err
-	}
-
 	c := &Client{
 		userAgent:     defaultUserAgent,
 		staticHeaders: http.Header{},
 		retry:         defaultRetryConfig(),
 	}
-
-	layered := envOpts
 	if apiURL != "" {
-		layered = append(layered, WithBaseURL(apiURL))
+		c.rawBaseURL = apiURL
 	}
-	layered = append(layered, opts...)
-	for _, o := range layered {
+	for _, o := range opts {
 		o(c)
 	}
 
@@ -75,9 +64,32 @@ func NewClient(apiURL string, opts ...Option) (*Client, error) {
 	return c.finish(), nil
 }
 
-// configOptions turns environment-derived settings into the lowest-precedence
-// option layer, reusing the public option constructors so env and explicit
-// configuration share one code path.
+// NewClientFromEnv creates a client from FGA_* environment variables, with opts
+// overriding the environment-derived configuration. It is the explicit opt-in
+// for environment configuration; NewClient alone never reads the environment.
+func NewClientFromEnv(opts ...Option) (*Client, error) {
+	envOpts, err := EnvOptions()
+	if err != nil {
+		return nil, err
+	}
+	return NewClient("", append(envOpts, opts...)...)
+}
+
+// EnvOptions resolves FGA_* environment variables into client options for
+// NewClient. Place them ahead of your own options so explicit settings win:
+//
+//	envOpts, err := openfga.EnvOptions()
+//	client, err := openfga.NewClient("", append(envOpts, opts...)...)
+func EnvOptions() ([]Option, error) {
+	envCfg, err := config.Load()
+	if err != nil {
+		return nil, err
+	}
+	return configOptions(envCfg)
+}
+
+// configOptions turns environment-derived settings into options, reusing the
+// public option constructors so env and explicit configuration share one path.
 func configOptions(cfg config.Config) ([]Option, error) {
 	var opts []Option
 	if cfg.APIURL != "" {
