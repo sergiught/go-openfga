@@ -217,6 +217,9 @@ resp, err := client.Tuples.WriteTuples(ctx, keys,
 if err != nil {
 	return err // only set when no request could be issued at all
 }
+if err := resp.FirstError(); err != nil {
+	return err // a partial failure: some chunk(s) failed
+}
 for _, r := range resp.Writes {
 	if r.Status == openfga.WriteStatusFailure {
 		fmt.Println("failed:", r.TupleKey, r.Err)
@@ -224,8 +227,10 @@ for _, r := range resp.Writes {
 }
 ```
 
-Pass `openfga.WithTransaction()` to send everything as one transactional request
-instead of chunking.
+Because per-tuple failures are reported in the response rather than the returned
+error, call `resp.FirstError()` (or `resp.Failed()` for the full list) to detect a
+partial failure with one check. Pass `openfga.WithTransaction()` to send
+everything as one transactional request instead of chunking.
 
 ### Write-conflict handling
 
@@ -294,6 +299,40 @@ req, err := dsl.ToModel(dslText)
 // A model -> DSL text.
 out, err := dsl.ToDSL(model)
 ```
+
+### Authoring models in Go
+
+For building a model programmatically without the DSL, the core package exposes a
+strongly-typed schema and small builder helpers, so relation rewrites read close
+to the DSL and the compiler checks your work:
+
+```go
+req := &openfga.WriteAuthorizationModelRequest{
+	SchemaVersion: "1.1",
+	TypeDefinitions: []openfga.TypeDefinition{
+		{Type: "user"},
+		{
+			Type: "document",
+			Relations: map[string]openfga.Userset{
+				"owner":  openfga.This(),
+				"editor": openfga.Union(openfga.This(), openfga.ComputedUserset("owner")),
+				"viewer": openfga.TupleTo("parent", "viewer"), // "viewer from parent"
+			},
+			Metadata: &openfga.Metadata{
+				Relations: map[string]openfga.RelationMetadata{
+					"owner":  {DirectlyRelatedUserTypes: []openfga.RelationReference{openfga.DirectType("user")}},
+					"editor": {DirectlyRelatedUserTypes: []openfga.RelationReference{openfga.DirectType("user")}},
+				},
+			},
+		},
+	},
+}
+```
+
+The builders map to the DSL operators: `This` (`[...]`), `ComputedUserset` (a bare
+relation), `TupleTo` (`X from Y`), `Union` (`or`), `Intersection` (`and`), and
+`Exclusion` (`but not`). The typed schema round-trips losslessly with the `dsl`
+module, so you can mix the two.
 
 ## Configuration
 
