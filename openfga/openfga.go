@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+
+	"github.com/sergiught/go-openfga/internal/config"
 )
 
 const defaultUserAgent = "go-openfga"
@@ -47,6 +49,13 @@ func NewClient(apiURL string, opts ...Option) (*Client, error) {
 		staticHeaders: http.Header{},
 		retry:         defaultRetryConfig(),
 	}
+	envCfg, err := config.Load()
+	if err != nil {
+		return nil, err
+	}
+	if err := seedFromConfig(c, envCfg); err != nil {
+		return nil, err
+	}
 	if apiURL != "" {
 		c.rawBaseURL = apiURL
 	}
@@ -74,6 +83,37 @@ func NewClient(apiURL string, opts ...Option) (*Client, error) {
 	c.Relationships = (*RelationshipsService)(&c.common)
 	c.Assertions = (*AssertionsService)(&c.common)
 	return c, nil
+}
+
+// seedFromConfig applies environment-derived settings as the base layer. Values
+// here are overridden by the positional apiURL and by functional options.
+func seedFromConfig(c *Client, cfg config.Config) error {
+	if cfg.APIURL != "" {
+		c.rawBaseURL = cfg.APIURL
+	}
+	if cfg.StoreID != "" {
+		c.storeID = cfg.StoreID
+	}
+	if cfg.AuthModelID != "" {
+		c.authModelID = cfg.AuthModelID
+	}
+	switch {
+	case cfg.APIToken != "":
+		c.auth = &apiTokenSource{token: cfg.APIToken}
+	case cfg.HasClientCredentials():
+		tokenURL, err := config.NormalizeTokenURL(cfg.TokenIssuer)
+		if err != nil {
+			return err
+		}
+		c.auth = &clientCredentialsSpec{
+			tokenURL:     tokenURL,
+			clientID:     cfg.ClientID,
+			clientSecret: cfg.ClientSecret,
+			audience:     cfg.Audience,
+			scopes:       cfg.Scopes,
+		}
+	}
+	return nil
 }
 
 // buildTransport composes: retry -> auth -> static-headers -> base.
