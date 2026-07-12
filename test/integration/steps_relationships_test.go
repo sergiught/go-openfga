@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/cucumber/godog"
@@ -26,6 +27,31 @@ func registerRelationshipsSteps(sc *godog.ScenarioContext, st *suiteState) {
 	sc.Step(`^the streamed objects include "([^"]*)"$`, st.objectsInclude)
 	sc.Step(`^I list users of type "([^"]*)" that can "([^"]*)" "([^"]*)"$`, st.listUsers)
 	sc.Step(`^the users include "([^"]*)"$`, st.usersInclude)
+	sc.Step(`^I list which of "([^"]*)" "([^"]*)" has on "([^"]*)"$`, st.listRelations)
+	sc.Step(`^the granted relations are "([^"]*)"$`, st.grantedRelationsAre)
+}
+
+func (st *suiteState) listRelations(ctx context.Context, relationsCSV, user, object string) error {
+	got, err := st.client.Relationships.ListRelations(ctx, &openfga.ListRelationsRequest{
+		AuthorizationModelID: st.modelID,
+		User:                 user,
+		Object:               object,
+		Relations:            strings.Split(relationsCSV, ","),
+	})
+	st.lastErr = err
+	st.relations = got
+	return nil
+}
+
+func (st *suiteState) grantedRelationsAre(expectedCSV string) error {
+	if st.lastErr != nil {
+		return fmt.Errorf("list relations failed: %w", st.lastErr)
+	}
+	want := strings.Split(expectedCSV, ",")
+	if !slices.Equal(st.relations, want) {
+		return fmt.Errorf("granted relations = %v, want %v", st.relations, want)
+	}
+	return nil
 }
 
 // check performs a Check. Action step: captures error into st.lastErr.

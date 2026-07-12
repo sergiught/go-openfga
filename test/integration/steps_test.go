@@ -29,6 +29,8 @@ type suiteState struct {
 	batch      *openfga.BatchCheckResponse
 	batchItems []openfga.BatchCheckItem
 	assertions []openfga.Assertion
+	relations  []string
+	writeResp  *openfga.WriteTuplesResponse
 }
 
 func registerSteps(sc *godog.ScenarioContext, st *suiteState) {

@@ -65,3 +65,8 @@ Feature: Relationship queries against a live OpenFGA server
     Given the tuple "user:anne" "viewer" "document:roadmap" is written
     When I list users of type "user" that can "viewer" "document:roadmap"
     Then the users include "user:anne"
+
+  Scenario: List relations returns the granted relations in input order
+    Given the tuple "user:anne" "editor" "document:roadmap" is written
+    When I list which of "owner,editor,viewer" "user:anne" has on "document:roadmap"
+    Then the granted relations are "editor,viewer"
