@@ -112,7 +112,7 @@ jobs:
       - name: test dsl module
         working-directory: dsl
         shell: bash
-        run: go test -race -count=1 ./...
+        run: go test -race -count=1 -coverprofile=coverage.out -covermode=atomic ./...
       - name: upload coverage to Codecov
         # Only the floor run on Linux uploads; otherwise the matrix double-counts.
         if: matrix.go-version == '1.25.12' && matrix.os == 'ubuntu-latest'
@@ -121,6 +121,15 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage/unit.out
           flags: unit
+          fail_ci_if_error: false
+      - name: upload dsl coverage to Codecov
+        # Only the floor run on Linux uploads; otherwise the matrix double-counts.
+        if: matrix.go-version == '1.25.12' && matrix.os == 'ubuntu-latest'
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./dsl/coverage.out
+          flags: dsl
           fail_ci_if_error: false
 
   integration:

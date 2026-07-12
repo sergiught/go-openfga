@@ -68,11 +68,13 @@ lint-commits: $(BINARIES_DIR)/commitlint ## Lint the current commit message agai
 	@$(BINARIES_DIR)/commitlint lint
 
 .PHONY: vuln
-vuln: $(BINARIES_DIR)/govulncheck ## Scan the root and dsl module graphs for known Go vulnerabilities
+vuln: $(BINARIES_DIR)/govulncheck ## Scan the root, dsl and integration module graphs for known Go vulnerabilities
 	@echo "==> Scanning module graph for known Go vulnerabilities"
 	@$(BINARIES_DIR)/govulncheck ./...
 	@echo "==> Scanning dsl module graph for known Go vulnerabilities"
 	@cd dsl && $(BINARIES_DIR)/govulncheck ./...
+	@echo "==> Scanning test/integration module graph for known Go vulnerabilities"
+	@cd test/integration && $(BINARIES_DIR)/govulncheck ./...
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Housekeeping (formatting + module hygiene + git hooks)

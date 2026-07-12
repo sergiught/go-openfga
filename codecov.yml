@@ -1,9 +1,10 @@
 # Codecov configuration.
 #
-# Coverage is uploaded from ci.yml under the `unit` flag. The integration
-# suite lives in its own module (test/integration) and is exercised by the
-# `integration` CI job, not measured for line coverage here. Keep the status
-# checks informational rather than blocking while the library is pre-1.0.
+# Coverage is uploaded from ci.yml under the `unit` flag (root module) and the
+# `dsl` flag (the dsl module). The integration suite lives in its own module
+# (test/integration) and is exercised by the `integration` CI job, not measured
+# for line coverage here. Keep the status checks informational rather than
+# blocking while the library is pre-1.0.
 coverage:
   status:
     project:
@@ -12,6 +13,12 @@ coverage:
     patch:
       default:
         informational: true
+
+flags:
+  unit:
+    carryforward: true
+  dsl:
+    carryforward: true
 
 comment:
   layout: "reach, diff, flags, files"
