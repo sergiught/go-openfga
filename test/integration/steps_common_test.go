@@ -101,46 +101,44 @@ func sharedModel() *openfga.WriteAuthorizationModelRequest {
 		SchemaVersion: "1.1",
 		TypeDefinitions: []openfga.TypeDefinition{
 			{Type: "user"},
-			{Type: "group", Relations: map[string]any{
-				"member": map[string]any{"this": map[string]any{}},
-			}, Metadata: map[string]any{
-				"relations": map[string]any{
-					"member": map[string]any{
-						"directly_related_user_types": []map[string]any{{"type": "user"}},
+			{
+				Type:      "group",
+				Relations: map[string]openfga.Userset{"member": openfga.This()},
+				Metadata: &openfga.Metadata{
+					Relations: map[string]openfga.RelationMetadata{
+						"member": {DirectlyRelatedUserTypes: []openfga.RelationReference{
+							openfga.DirectType("user"),
+						}},
 					},
 				},
-			}},
-			{Type: "document", Relations: map[string]any{
-				"owner":  map[string]any{"this": map[string]any{}},
-				"editor": map[string]any{"this": map[string]any{}},
-				"viewer": map[string]any{
-					"union": map[string]any{
-						"child": []map[string]any{
-							{"this": map[string]any{}},
-							{"computedUserset": map[string]any{"relation": "editor"}},
-							{"computedUserset": map[string]any{"relation": "owner"}},
-						},
+			},
+			{
+				Type: "document",
+				Relations: map[string]openfga.Userset{
+					"owner":  openfga.This(),
+					"editor": openfga.This(),
+					"viewer": openfga.Union(
+						openfga.This(),
+						openfga.ComputedUserset("editor"),
+						openfga.ComputedUserset("owner"),
+					),
+				},
+				Metadata: &openfga.Metadata{
+					Relations: map[string]openfga.RelationMetadata{
+						"owner": {DirectlyRelatedUserTypes: []openfga.RelationReference{
+							openfga.DirectType("user"),
+						}},
+						"editor": {DirectlyRelatedUserTypes: []openfga.RelationReference{
+							openfga.DirectType("user"),
+							{Type: "group", Relation: "member"},
+						}},
+						"viewer": {DirectlyRelatedUserTypes: []openfga.RelationReference{
+							openfga.DirectType("user"),
+							{Type: "group", Relation: "member"},
+						}},
 					},
 				},
-			}, Metadata: map[string]any{
-				"relations": map[string]any{
-					"owner": map[string]any{
-						"directly_related_user_types": []map[string]any{{"type": "user"}},
-					},
-					"editor": map[string]any{
-						"directly_related_user_types": []map[string]any{
-							{"type": "user"},
-							{"type": "group", "relation": "member"},
-						},
-					},
-					"viewer": map[string]any{
-						"directly_related_user_types": []map[string]any{
-							{"type": "user"},
-							{"type": "group", "relation": "member"},
-						},
-					},
-				},
-			}},
+			},
 		},
 	}
 }

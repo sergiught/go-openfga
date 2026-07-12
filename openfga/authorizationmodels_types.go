@@ -2,24 +2,26 @@ package openfga
 
 // AuthorizationModel represents an OpenFGA authorization model.
 type AuthorizationModel struct {
-	ID              string           `json:"id"`
-	SchemaVersion   string           `json:"schema_version"`
-	TypeDefinitions []TypeDefinition `json:"type_definitions"`
-	Conditions      map[string]any   `json:"conditions,omitempty"`
+	ID              string               `json:"id"`
+	SchemaVersion   string               `json:"schema_version"`
+	TypeDefinitions []TypeDefinition     `json:"type_definitions"`
+	Conditions      map[string]Condition `json:"conditions,omitempty"`
 }
 
-// TypeDefinition describes a single type within an authorization model.
+// TypeDefinition describes a single type within an authorization model. Relations
+// maps each relation name to its rewrite rule (Userset); Metadata carries the
+// directly-assignable user types for those relations.
 type TypeDefinition struct {
-	Type      string         `json:"type"`
-	Relations map[string]any `json:"relations,omitempty"`
-	Metadata  map[string]any `json:"metadata,omitempty"`
+	Type      string             `json:"type"`
+	Relations map[string]Userset `json:"relations,omitempty"`
+	Metadata  *Metadata          `json:"metadata,omitempty"`
 }
 
 // WriteAuthorizationModelRequest is the body sent to the Write method.
 type WriteAuthorizationModelRequest struct {
-	SchemaVersion   string           `json:"schema_version"`
-	TypeDefinitions []TypeDefinition `json:"type_definitions"`
-	Conditions      map[string]any   `json:"conditions,omitempty"`
+	SchemaVersion   string               `json:"schema_version"`
+	TypeDefinitions []TypeDefinition     `json:"type_definitions"`
+	Conditions      map[string]Condition `json:"conditions,omitempty"`
 }
 
 // WriteAuthorizationModelResponse is returned by the Write method.

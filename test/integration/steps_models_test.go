@@ -56,10 +56,8 @@ func (st *suiteState) writeInvalidModel(ctx context.Context) error {
 		SchemaVersion: "1.1",
 		TypeDefinitions: []openfga.TypeDefinition{
 			{Type: "user"},
-			{Type: "document", Relations: map[string]any{
-				"viewer": map[string]any{
-					"computedUserset": map[string]any{"relation": "missing"},
-				},
+			{Type: "document", Relations: map[string]openfga.Userset{
+				"viewer": openfga.ComputedUserset("missing"),
 			}},
 		},
 	})
