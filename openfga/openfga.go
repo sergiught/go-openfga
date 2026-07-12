@@ -42,78 +42,98 @@ type service struct{ client *Client }
 type Option func(*Client)
 
 // NewClient creates a client targeting apiURL (e.g. "https://api.fga.example").
-// Configuration is layered: environment (FGA_*) first, then apiURL, then options.
+// Configuration is layered lowest-to-highest: environment (FGA_*), then apiURL,
+// then functional options — expressed as the order they are applied below.
 func NewClient(apiURL string, opts ...Option) (*Client, error) {
+	envCfg, err := config.Load()
+	if err != nil {
+		return nil, err
+	}
+	envOpts, err := configOptions(envCfg)
+	if err != nil {
+		return nil, err
+	}
+
 	c := &Client{
 		userAgent:     defaultUserAgent,
 		staticHeaders: http.Header{},
 		retry:         defaultRetryConfig(),
 	}
-	envCfg, err := config.Load()
-	if err != nil {
-		return nil, err
-	}
-	if err := seedFromConfig(c, envCfg); err != nil {
-		return nil, err
-	}
+
+	layered := envOpts
 	if apiURL != "" {
-		c.rawBaseURL = apiURL
+		layered = append(layered, WithBaseURL(apiURL))
 	}
-	for _, o := range opts {
+	layered = append(layered, opts...)
+	for _, o := range layered {
 		o(c)
 	}
 
 	if err := c.validate(); err != nil {
 		return nil, err
 	}
+	return c.finish(), nil
+}
 
+// configOptions turns environment-derived settings into the lowest-precedence
+// option layer, reusing the public option constructors so env and explicit
+// configuration share one code path.
+func configOptions(cfg config.Config) ([]Option, error) {
+	var opts []Option
+	if cfg.APIURL != "" {
+		opts = append(opts, WithBaseURL(cfg.APIURL))
+	}
+	if cfg.StoreID != "" {
+		opts = append(opts, WithStoreID(cfg.StoreID))
+	}
+	if cfg.AuthModelID != "" {
+		opts = append(opts, WithAuthorizationModelID(cfg.AuthModelID))
+	}
+	switch {
+	case cfg.APIToken != "":
+		opts = append(opts, WithAPIToken(cfg.APIToken))
+	case cfg.HasClientCredentials():
+		tokenURL, err := config.NormalizeTokenURL(cfg.TokenIssuer)
+		if err != nil {
+			return nil, err
+		}
+		opts = append(opts, WithClientCredentials(ClientCredentialsConfig{
+			TokenURL:     tokenURL,
+			ClientID:     cfg.ClientID,
+			ClientSecret: cfg.ClientSecret,
+			Audience:     cfg.Audience,
+			Scopes:       cfg.Scopes,
+		}))
+	}
+	return opts, nil
+}
+
+// finish assembles the HTTP client and service handles after validation.
+func (c *Client) finish() *Client {
+	c.buildHTTPClient()
+	c.wireServices()
+	return c
+}
+
+// buildHTTPClient assembles the auth + transport chain, unless the caller
+// supplied a full *http.Client via WithHTTPClient.
+func (c *Client) buildHTTPClient() {
 	if c.auth != nil {
 		c.authTransport = c.auth.transport()
 	}
-
-	// Assemble the transport chain unless the caller supplied a full client.
 	if c.client == nil {
 		c.client = &http.Client{Transport: c.buildTransport(http.DefaultTransport)}
 	}
+}
 
+// wireServices points the sub-service handles at the client.
+func (c *Client) wireServices() {
 	c.common.client = c
 	c.Stores = (*StoresService)(&c.common)
 	c.AuthorizationModels = (*AuthorizationModelsService)(&c.common)
 	c.Tuples = (*TuplesService)(&c.common)
 	c.Relationships = (*RelationshipsService)(&c.common)
 	c.Assertions = (*AssertionsService)(&c.common)
-	return c, nil
-}
-
-// seedFromConfig applies environment-derived settings as the base layer. Values
-// here are overridden by the positional apiURL and by functional options.
-func seedFromConfig(c *Client, cfg config.Config) error {
-	if cfg.APIURL != "" {
-		c.rawBaseURL = cfg.APIURL
-	}
-	if cfg.StoreID != "" {
-		c.storeID = cfg.StoreID
-	}
-	if cfg.AuthModelID != "" {
-		c.authModelID = cfg.AuthModelID
-	}
-	switch {
-	case cfg.APIToken != "":
-		c.auth = &apiTokenSource{token: cfg.APIToken}
-	case cfg.HasClientCredentials():
-		tokenURL, err := config.NormalizeTokenURL(cfg.TokenIssuer)
-		if err != nil {
-			return err
-		}
-		c.auth = &clientCredentialsSpec{
-			tokenURL:     tokenURL,
-			clientID:     cfg.ClientID,
-			clientSecret: cfg.ClientSecret,
-			audience:     cfg.Audience,
-			scopes:       cfg.Scopes,
-		}
-	}
-	return nil
 }
 
 // buildTransport composes: retry -> auth -> static-headers -> base.
