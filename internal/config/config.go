@@ -3,6 +3,9 @@ package config
 
 import (
 	"errors"
+	"fmt"
+	"net/url"
+	"strings"
 
 	"github.com/caarlos0/env/v11"
 )
@@ -40,4 +43,28 @@ func Load() (Config, error) {
 func (c Config) HasClientCredentials() bool {
 	return c.ClientID != "" || c.ClientSecret != "" || c.TokenIssuer != "" ||
 		c.Audience != "" || len(c.Scopes) > 0
+}
+
+// NormalizeTokenURL turns an OAuth2 issuer into a full token endpoint, mirroring
+// the official SDK: a bare host gets an https scheme, a missing or root path
+// becomes /oauth/token, and non-http(s) schemes are rejected. An empty issuer
+// returns "" so the caller's completeness check reports the missing endpoint.
+func NormalizeTokenURL(issuer string) (string, error) {
+	if issuer == "" {
+		return "", nil
+	}
+	if !strings.Contains(issuer, "://") {
+		issuer = "https://" + issuer
+	}
+	u, err := url.Parse(issuer)
+	if err != nil {
+		return "", fmt.Errorf("config: invalid FGA_API_TOKEN_ISSUER %q: %w", issuer, err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return "", fmt.Errorf("config: FGA_API_TOKEN_ISSUER scheme %q must be http or https", u.Scheme)
+	}
+	if u.Path == "" || u.Path == "/" {
+		u.Path = "/oauth/token"
+	}
+	return u.String(), nil
 }
