@@ -135,3 +135,33 @@ type WriteTuplesResponse struct {
 	Writes  []TupleResult
 	Deletes []TupleResult
 }
+
+// Failed returns the per-tuple results that did not succeed, scanning both the
+// Writes and Deletes slices so it serves WriteTuples and DeleteTuples alike.
+// The result is nil when every tuple succeeded.
+func (r *WriteTuplesResponse) Failed() []TupleResult {
+	var failed []TupleResult
+	for _, results := range [][]TupleResult{r.Writes, r.Deletes} {
+		for _, res := range results {
+			if res.Status == WriteStatusFailure {
+				failed = append(failed, res)
+			}
+		}
+	}
+	return failed
+}
+
+// FirstError returns the error from the first failed tuple, or nil if every
+// tuple succeeded. Because WriteTuples and DeleteTuples report failures
+// per-tuple (their returned error is non-nil only when no request could be
+// issued at all), call this to detect a partial failure with one check.
+func (r *WriteTuplesResponse) FirstError() error {
+	for _, results := range [][]TupleResult{r.Writes, r.Deletes} {
+		for _, res := range results {
+			if res.Err != nil {
+				return res.Err
+			}
+		}
+	}
+	return nil
+}
