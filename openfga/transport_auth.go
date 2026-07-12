@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,6 +18,13 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
 )
+
+// authSpec is a credential configuration that can be validated and turned into
+// an auth RoundTripper. Options store a spec; NewClient validates and builds it.
+type authSpec interface {
+	validate() error
+	transport() http.RoundTripper
+}
 
 // wrapAuth places an auth transport in front of base. The auth transport is
 // expected to be an *oauth2.Transport whose Base we set to base.
@@ -40,6 +48,13 @@ func (s *apiTokenSource) transport() http.RoundTripper {
 	return &bearerTransport{token: s.token}
 }
 
+func (s *apiTokenSource) validate() error {
+	if s.token == "" {
+		return errors.New("openfga: api token is empty")
+	}
+	return nil
+}
+
 type bearerTransport struct {
 	token string
 	base  http.RoundTripper
@@ -57,7 +72,7 @@ func (t *bearerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 // WithAPIToken authenticates with a pre-shared key (Authorization: Bearer).
 func WithAPIToken(token string) Option {
-	return func(c *Client) { c.authTransport = (&apiTokenSource{token: token}).transport() }
+	return func(c *Client) { c.auth = &apiTokenSource{token: token} }
 }
 
 // OAuth2 client credentials.
@@ -71,22 +86,52 @@ type ClientCredentialsConfig struct {
 	Scopes       []string
 }
 
+type clientCredentialsSpec struct {
+	tokenURL     string
+	clientID     string
+	clientSecret string
+	audience     string
+	scopes       []string
+}
+
+func (s *clientCredentialsSpec) validate() error {
+	switch {
+	case s.tokenURL == "":
+		return errors.New("openfga: client credentials require a token URL")
+	case s.clientID == "":
+		return errors.New("openfga: client credentials require a client ID")
+	case s.clientSecret == "":
+		return errors.New("openfga: client credentials require a client secret")
+	}
+	return nil
+}
+
+func (s *clientCredentialsSpec) transport() http.RoundTripper {
+	params := map[string][]string{}
+	if s.audience != "" {
+		params["audience"] = []string{s.audience}
+	}
+	oc := &clientcredentials.Config{
+		ClientID:       s.clientID,
+		ClientSecret:   s.clientSecret,
+		TokenURL:       s.tokenURL,
+		Scopes:         s.scopes,
+		EndpointParams: params,
+	}
+	ts := oc.TokenSource(context.Background())
+	return &oauth2.Transport{Source: oauth2.ReuseTokenSource(nil, ts)}
+}
+
 // WithClientCredentials authenticates via the OAuth2 client-credentials grant.
 func WithClientCredentials(cfg ClientCredentialsConfig) Option {
 	return func(c *Client) {
-		params := map[string][]string{}
-		if cfg.Audience != "" {
-			params["audience"] = []string{cfg.Audience}
+		c.auth = &clientCredentialsSpec{
+			tokenURL:     cfg.TokenURL,
+			clientID:     cfg.ClientID,
+			clientSecret: cfg.ClientSecret,
+			audience:     cfg.Audience,
+			scopes:       cfg.Scopes,
 		}
-		oc := &clientcredentials.Config{
-			ClientID:       cfg.ClientID,
-			ClientSecret:   cfg.ClientSecret,
-			TokenURL:       cfg.TokenURL,
-			Scopes:         cfg.Scopes,
-			EndpointParams: params,
-		}
-		ts := oc.TokenSource(context.Background())
-		c.authTransport = &oauth2.Transport{Source: oauth2.ReuseTokenSource(nil, ts)}
 	}
 }
 
@@ -186,10 +231,25 @@ func (s *privateKeyJWTSource) Token() (*oauth2.Token, error) {
 	return tok, nil
 }
 
+func (s *privateKeyJWTSource) validate() error {
+	switch {
+	case s.cfg.TokenURL == "":
+		return errors.New("openfga: private key JWT requires a token URL")
+	case s.cfg.ClientID == "":
+		return errors.New("openfga: private key JWT requires a client ID")
+	case s.cfg.SigningKey == nil:
+		return errors.New("openfga: private key JWT requires a signing key")
+	case s.cfg.SigningMethod == nil:
+		return errors.New("openfga: private key JWT requires a signing method")
+	}
+	return nil
+}
+
+func (s *privateKeyJWTSource) transport() http.RoundTripper {
+	return &oauth2.Transport{Source: oauth2.ReuseTokenSource(nil, s)}
+}
+
 // WithPrivateKeyJWT authenticates using a signed JWT client assertion.
 func WithPrivateKeyJWT(cfg PrivateKeyJWTConfig) Option {
-	return func(c *Client) {
-		src := &privateKeyJWTSource{cfg: cfg}
-		c.authTransport = &oauth2.Transport{Source: oauth2.ReuseTokenSource(nil, src)}
-	}
+	return func(c *Client) { c.auth = &privateKeyJWTSource{cfg: cfg} }
 }

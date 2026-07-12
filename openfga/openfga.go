@@ -21,6 +21,7 @@ type Client struct {
 
 	// Transport-layer config assembled in NewClient.
 	staticHeaders http.Header
+	auth          authSpec
 	authTransport http.RoundTripper
 	retry         *RetryConfig
 
@@ -59,6 +60,10 @@ func NewClient(apiURL string, opts ...Option) (*Client, error) {
 	}
 	for _, o := range opts {
 		o(c)
+	}
+
+	if c.auth != nil {
+		c.authTransport = c.auth.transport()
 	}
 
 	// Assemble the transport chain unless the caller supplied a full client.

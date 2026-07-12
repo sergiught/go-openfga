@@ -57,7 +57,7 @@ func TestWithClientCredentials_SendsBearerToken(t *testing.T) {
 			}
 			c := &Client{}
 			WithClientCredentials(cfg)(c)
-			return c.authTransport
+			return c.auth.transport()
 		}(),
 		crt,
 	)
