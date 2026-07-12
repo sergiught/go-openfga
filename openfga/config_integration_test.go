@@ -65,6 +65,16 @@ func TestNewClientFromEnv_ConflictingAuthErrors(t *testing.T) {
 	}
 }
 
+func TestNewClientFromEnv_BadIssuerSchemeErrors(t *testing.T) {
+	t.Setenv("FGA_API_URL", "https://env.fga.example")
+	t.Setenv("FGA_CLIENT_ID", "cid")
+	t.Setenv("FGA_CLIENT_SECRET", "csecret")
+	t.Setenv("FGA_API_TOKEN_ISSUER", "ftp://issuer.example")
+	if _, err := NewClientFromEnv(); err == nil {
+		t.Fatal("expected error for non-http(s) issuer scheme")
+	}
+}
+
 func TestNewClient_IgnoresEnv(t *testing.T) {
 	t.Setenv("FGA_API_URL", "https://env.fga.example")
 	t.Setenv("FGA_STORE_ID", testStoreID)

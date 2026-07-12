@@ -62,6 +62,48 @@ func TestWithPrivateKeyJWT_WiresAuthTransport(t *testing.T) {
 	_ = url.Values{}
 }
 
+func TestPrivateKeyJWT_TokenSuccess(t *testing.T) {
+	key, _ := rsa.GenerateKey(rand.Reader, 2048)
+	var gotForm url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		gotForm = r.Form
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, `{"access_token":"tok-123","token_type":"Bearer","expires_in":3600}`)
+	}))
+	defer srv.Close()
+
+	src := &privateKeyJWTSource{cfg: PrivateKeyJWTConfig{
+		TokenURL:      srv.URL,
+		ClientID:      "cid",
+		Audience:      "https://issuer.example",
+		APIAudience:   "https://api.fga.example",
+		Scopes:        []string{"read", "write"},
+		SigningKey:    key,
+		SigningMethod: jwt.SigningMethodRS256,
+		KeyID:         "kid-1",
+	}}
+	tok, err := src.Token()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tok.AccessToken != "tok-123" {
+		t.Errorf("access token = %q", tok.AccessToken)
+	}
+	if tok.Expiry.IsZero() {
+		t.Error("expiry should be set from expires_in")
+	}
+	if gotForm.Get("client_assertion") == "" {
+		t.Error("client_assertion not posted")
+	}
+	if gotForm.Get("audience") != "https://api.fga.example" {
+		t.Errorf("audience = %q, want API audience", gotForm.Get("audience"))
+	}
+	if gotForm.Get("scope") != "read write" {
+		t.Errorf("scope = %q, want space-joined", gotForm.Get("scope"))
+	}
+}
+
 func TestPrivateKeyJWT_TokenReturnsErrorOnNon2xx(t *testing.T) {
 	key, _ := rsa.GenerateKey(rand.Reader, 2048)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -81,6 +81,36 @@ func TestCheckResponse_ErrorsAsReachesBase(t *testing.T) {
 	}
 }
 
+func TestErrorResponse_ErrorString(t *testing.T) {
+	err := classifyResponse(newHTTPResp(400, `{"code":"validation_error","message":"bad input"}`, ""))
+	msg := err.Error()
+	for _, want := range []string{"400", "validation_error", "bad input", "POST", "https://api.fga.example"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("Error() = %q, missing %q", msg, want)
+		}
+	}
+}
+
+func TestErrorResponse_ErrorString_NoResponse(t *testing.T) {
+	e := &ErrorResponse{Code: "x", Message: "y"}
+	if got := e.Error(); !strings.Contains(got, " 0 ") {
+		t.Errorf("Error() with nil Response = %q, want statusCode 0", got)
+	}
+}
+
+func TestTypedErrors_UnwrapReachesBase(t *testing.T) {
+	for _, status := range []int{401, 403, 404, 429, 500} {
+		err := classifyResponse(newHTTPResp(status, `{"code":"c","message":"m"}`, ""))
+		var base *ErrorResponse
+		if !errors.As(err, &base) {
+			t.Errorf("status %d: Unwrap did not reach *ErrorResponse (%T)", status, err)
+		}
+		if err.Error() == "" {
+			t.Errorf("status %d: empty Error()", status)
+		}
+	}
+}
+
 func TestParseRetryAfter_HTTPDate(t *testing.T) {
 	// Pick a time clearly in the future.
 	future := time.Now().UTC().Add(10 * time.Second)

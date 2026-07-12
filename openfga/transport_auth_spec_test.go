@@ -20,8 +20,12 @@ func TestAuthSpecValidate(t *testing.T) {
 		{"client creds ok", &clientCredentialsSpec{tokenURL: "https://t/x", clientID: "c", clientSecret: "s"}, false},
 		{"client creds no secret", &clientCredentialsSpec{tokenURL: "https://t/x", clientID: "c"}, true},
 		{"client creds no url", &clientCredentialsSpec{clientID: "c", clientSecret: "s"}, true},
+		{"client creds no id", &clientCredentialsSpec{tokenURL: "https://t/x", clientSecret: "s"}, true},
 		{"jwt ok", &privateKeyJWTSource{cfg: PrivateKeyJWTConfig{TokenURL: "https://t/x", ClientID: "c", SigningKey: key, SigningMethod: jwt.SigningMethodRS256}}, false},
+		{"jwt no url", &privateKeyJWTSource{cfg: PrivateKeyJWTConfig{ClientID: "c", SigningKey: key, SigningMethod: jwt.SigningMethodRS256}}, true},
+		{"jwt no client id", &privateKeyJWTSource{cfg: PrivateKeyJWTConfig{TokenURL: "https://t/x", SigningKey: key, SigningMethod: jwt.SigningMethodRS256}}, true},
 		{"jwt no key", &privateKeyJWTSource{cfg: PrivateKeyJWTConfig{TokenURL: "https://t/x", ClientID: "c", SigningMethod: jwt.SigningMethodRS256}}, true},
+		{"jwt no method", &privateKeyJWTSource{cfg: PrivateKeyJWTConfig{TokenURL: "https://t/x", ClientID: "c", SigningKey: key}}, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
