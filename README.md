@@ -32,8 +32,9 @@ authentication, retries, and custom headers are layered as composable
 - **Full v1 API coverage** — stores, authorization models, relationship tuples, all
   relationship queries (check, batch-check, expand, list-objects, list-users), and
   assertions.
-- **Four authentication modes** — no-auth, pre-shared API token, OAuth2
-  client-credentials, and private-key JWT (RFC 7523 client assertion).
+- **Five authentication modes** — no-auth, pre-shared API token, OAuth2
+  client-credentials, private-key JWT (RFC 7523 client assertion), and any
+  `oauth2.TokenSource`.
 - **Auto-paginating iterators** — Go 1.23 range-over-func for stores, models, tuple
   reads and changes, plus manual cursor control when you need it.
 - **Bulk & parallel helpers** — `WriteTuples`/`DeleteTuples` chunk large slices into
@@ -47,6 +48,9 @@ authentication, retries, and custom headers are layered as composable
   HTTP 429, honoring `Retry-After`; 5xx is opt-in.
 - **Typed errors** — `*ValidationError`, `*AuthenticationError`, `*NotFoundError`,
   `*RateLimitError`, `*InternalError`, all reachable via `errors.As`.
+- **Composable transport** — layer tracing/metrics/logging under the auth+retry
+  chain with `WithBaseTransport`, or observe every attempt with
+  `WithRequestObserver`.
 - **Escape hatch** — `NewRequest`/`Do` let you call any endpoint while reusing the
   configured auth and transport stack.
 
@@ -84,13 +88,8 @@ func main() {
 		panic(err)
 	}
 
-	resp, _, err := client.Relationships.Check(context.Background(), &openfga.CheckRequest{
-		TupleKey: openfga.CheckRequestTupleKey{
-			User:     "user:anne",
-			Relation: "reader",
-			Object:   "document:budget",
-		},
-	})
+	allowed, _, err := client.Relationships.Allowed(
+		context.Background(), "user:anne", "reader", "document:budget")
 	var notFound *openfga.NotFoundError
 	switch {
 	case errors.As(err, &notFound):
@@ -98,14 +97,20 @@ func main() {
 	case err != nil:
 		panic(err)
 	default:
-		fmt.Println("allowed:", resp.Allowed)
+		fmt.Println("allowed:", allowed)
 	}
 }
 ```
 
+`Allowed` is the shortcut for the common check. For contextual tuples, ABAC
+context, or a per-call model, build a `CheckRequest` (optionally with
+`openfga.NewCheckRequest`) and call `Check`.
+
 Every typed method returns `(result, *Response, error)` (or `(*Response, error)` for
 writes), where `*Response` wraps the underlying `*http.Response` so you can inspect
-status codes and headers.
+status codes, headers, and the server request ID via `resp.RequestID()`. The
+fan-out helpers (`WriteTuples`, `DeleteTuples`, `BatchCheckAll`, `ListRelations`)
+issue several requests and so do not return a single `*Response`.
 
 ## Authentication
 
@@ -133,7 +138,38 @@ openfga.WithPrivateKeyJWT(openfga.PrivateKeyJWTConfig{
 	SigningKey:    privateKey, // *rsa.PrivateKey or *ecdsa.PrivateKey
 	SigningMethod: jwt.SigningMethodRS256,
 })
+
+// Any oauth2.TokenSource — for credential sources beyond the built-in modes
+// (Vault, workload identity, an existing token source, ...).
+openfga.WithTokenSource(mySource)
 ```
+
+Token fetches for the OAuth2 modes run through the configured base transport
+(see [Extensibility](#extensibility-and-observability)) with a bounded timeout,
+so a slow issuer cannot wedge your requests indefinitely.
+
+## Configuration from the environment
+
+`NewClient` never reads the environment. Opt in with `NewClientFromEnv`, which
+resolves `FGA_*` variables; explicit options override them.
+
+```go
+client, err := openfga.NewClientFromEnv(openfga.WithUserAgent("my-app/1.0"))
+```
+
+| Variable | Maps to |
+| --- | --- |
+| `FGA_API_URL` | Base URL |
+| `FGA_STORE_ID` | Default store ID |
+| `FGA_MODEL_ID` | Default authorization model ID |
+| `FGA_API_TOKEN` | Pre-shared API token auth |
+| `FGA_CLIENT_ID` / `FGA_CLIENT_SECRET` | OAuth2 client-credentials auth |
+| `FGA_API_TOKEN_ISSUER` | OAuth2 token endpoint |
+| `FGA_API_AUDIENCE` | OAuth2 audience |
+| `FGA_API_SCOPES` | OAuth2 scopes (comma-separated) |
+
+Use `openfga.EnvOptions()` to merge env-derived options with your own in a
+custom order.
 
 ## Pagination
 
@@ -266,14 +302,95 @@ Client-wide options are passed to `NewClient`:
 | Option | Purpose |
 | --- | --- |
 | `WithStoreID` / `WithAuthorizationModelID` | Defaults applied to every request. |
-| `WithAPIToken` / `WithClientCredentials` / `WithPrivateKeyJWT` | Authentication. |
-| `WithRetry(openfga.RetryConfig{...})` | Override retry attempts, backoff bounds, retryable statuses, jitter. |
+| `WithDefaultConsistency` | Default read consistency for queries and reads. |
+| `WithAPIToken` / `WithClientCredentials` / `WithPrivateKeyJWT` / `WithTokenSource` | Authentication. |
+| `WithRetry(openfga.RetryConfig{...})` / `WithoutRetry()` | Tune or disable retries. |
 | `WithHeaders(http.Header{...})` | Static headers on every request. |
 | `WithUserAgent` / `WithBaseURL` | Override the User-Agent or base URL. |
+| `WithBaseTransport` / `WithRequestObserver` | Add tracing/metrics/logging beneath the chain, or observe each attempt. |
 | `WithHTTPClient` | Supply your own `*http.Client` (disables the built-in transport chain). |
 
 Per-call options override client defaults for a single request:
 `WithStore`, `WithAuthorizationModel`, `WithConsistency`, and `WithRequestHeader`.
+(Each client-wide default has a matching per-call override: `WithStoreID`/`WithStore`,
+`WithAuthorizationModelID`/`WithAuthorizationModel`,
+`WithDefaultConsistency`/`WithConsistency`.)
+
+## Error handling
+
+Non-2xx responses become typed errors, all embedding `*ErrorResponse` and
+reachable with `errors.As`:
+
+| Type | HTTP status |
+| --- | --- |
+| `*ValidationError` | 400 |
+| `*AuthenticationError` | 401, 403 |
+| `*NotFoundError` | 404 |
+| `*RateLimitError` (carries `RetryAfter`) | 429 |
+| `*InternalError` | 5xx |
+
+```go
+allowed, _, err := client.Relationships.Allowed(ctx, "user:anne", "reader", "document:budget")
+
+var rl *openfga.RateLimitError
+switch {
+case errors.As(err, &rl):
+	// rl.RetryAfter, rl.RequestID()
+case err != nil:
+	// inspect (*openfga.ErrorResponse).Code — see the openfga.Code* constants
+}
+```
+
+`ErrorResponse.Code` holds the OpenFGA error code (match it against the
+`openfga.Code*` constants), and `ErrorResponse.RequestID()` returns the server
+correlation ID for support tickets.
+
+## Extensibility and observability
+
+The client owns only an `*http.Client`; auth, retries, and headers are layered
+as `http.RoundTripper` transports. To add tracing, metrics, or a custom dialer
+while keeping the SDK's auth and retries, set the innermost transport:
+
+```go
+openfga.WithBaseTransport(otelhttp.NewTransport(nil))
+```
+
+For lightweight logging or metrics without writing a transport, observe each
+attempt:
+
+```go
+openfga.WithRequestObserver(func(req *http.Request, resp *http.Response, err error, took time.Duration) {
+	log.Printf("%s %s -> %v (%s)", req.Method, req.URL.Path, statusOf(resp, err), took)
+})
+```
+
+`client.Transport()` returns the assembled chain if you want to reuse it
+elsewhere. `WithHTTPClient` remains the full escape hatch, but it replaces the
+entire chain (auth, retries, and headers included).
+
+## Testing against a fake
+
+The client talks to any base URL, so point it at an `httptest.Server` in unit
+tests — no live OpenFGA required:
+
+```go
+srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(`{"allowed": true}`))
+}))
+defer srv.Close()
+
+client, _ := openfga.NewClient(srv.URL, openfga.WithStoreID("01ARZ3NDEKTSV4RRFFQ69G5FAV"))
+```
+
+Give each request a deadline with `context.WithTimeout`; the deadline bounds the
+whole call including retries.
+
+## Stability
+
+Pre-1.0: the public API may change between minor versions. Pin a version and
+review the [changelog](CHANGELOG.md) before upgrading. Once tagged `v1.0.0`, the
+package follows semantic versioning.
 
 ## Documentation
 
