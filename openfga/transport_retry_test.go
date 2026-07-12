@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -53,6 +54,58 @@ func TestRetry_RetriesOn429ThenSucceeds(t *testing.T) {
 	}
 	if resp.StatusCode != 200 {
 		t.Errorf("status = %d", resp.StatusCode)
+	}
+}
+
+// errScriptRT returns queued errors in order; a nil entry yields a 200.
+type errScriptRT struct {
+	errs  []error
+	calls int
+}
+
+func (s *errScriptRT) RoundTrip(r *http.Request) (*http.Response, error) {
+	if r.Body != nil {
+		_, _ = io.Copy(io.Discard, r.Body)
+	}
+	i := s.calls
+	s.calls++
+	if i < len(s.errs) && s.errs[i] != nil {
+		return nil, s.errs[i]
+	}
+	return &http.Response{
+		StatusCode: 200,
+		Body:       io.NopCloser(bytes.NewReader(nil)),
+		Header:     http.Header{},
+		Request:    r,
+	}, nil
+}
+
+func TestRetry_RetriesTransientNetworkError(t *testing.T) {
+	base := &errScriptRT{errs: []error{syscall.ECONNRESET, nil}}
+	rt := &retryTransport{base: base, cfg: RetryConfig{MaxAttempts: 3, RetryableStatus: []int{429}}, wait: noWait}
+	req, _ := http.NewRequest(http.MethodPost, "https://x/", bytes.NewBufferString(`{}`))
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("err = %v, want nil after retrying the reset", err)
+	}
+	if resp.StatusCode != 200 {
+		t.Errorf("status = %d, want 200", resp.StatusCode)
+	}
+	if base.calls != 2 {
+		t.Errorf("calls = %d, want 2 (1 reset + 1 success)", base.calls)
+	}
+}
+
+func TestRetry_DoesNotRetryCancelledContext(t *testing.T) {
+	base := &errScriptRT{errs: []error{context.Canceled, nil}}
+	rt := &retryTransport{base: base, cfg: RetryConfig{MaxAttempts: 3, RetryableStatus: []int{429}}, wait: noWait}
+	req, _ := http.NewRequest(http.MethodGet, "https://x/", nil)
+	_, err := rt.RoundTrip(req)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
+	}
+	if base.calls != 1 {
+		t.Errorf("calls = %d, want 1 (cancellation must not retry)", base.calls)
 	}
 }
 

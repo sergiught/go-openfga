@@ -16,7 +16,7 @@ func TestStores_Create(t *testing.T) {
 	}))
 	defer srv.Close()
 	c := testClient(t, srv.URL)
-	store, _, err := c.Stores.Create(context.Background(), &CreateStoreRequest{Name: "demo"})
+	store, err := c.Stores.Create(context.Background(), &CreateStoreRequest{Name: "demo"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,11 +34,11 @@ func TestStores_List_WithQueryParams(t *testing.T) {
 	}))
 	defer srv.Close()
 	c := testClient(t, srv.URL)
-	page, resp, err := c.Stores.List(context.Background(), &ListStoresOptions{PageSize: 10, ContinuationToken: "tok"})
+	page, err := c.Stores.List(context.Background(), &ListStoresOptions{PageSize: 10, ContinuationToken: "tok"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(page.Stores) != 1 || resp.ContinuationToken != "" {
+	if len(page.Stores) != 1 || page.ContinuationToken != "" {
 		t.Errorf("page = %+v", page)
 	}
 }
@@ -57,10 +57,10 @@ func TestStores_GetAndDelete(t *testing.T) {
 	}))
 	defer srv.Close()
 	c := testClient(t, srv.URL)
-	if _, _, err := c.Stores.Get(context.Background(), "01H"); err != nil {
+	if _, err := c.Stores.Get(context.Background(), "01H"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := c.Stores.Delete(context.Background(), "01H"); err != nil {
+	if err := c.Stores.Delete(context.Background(), "01H"); err != nil {
 		t.Fatal(err)
 	}
 }

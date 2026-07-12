@@ -7,7 +7,7 @@ import (
 
 const (
 	defaultMaxParallel       = 10
-	defaultMaxPerChunk       = 1
+	defaultMaxPerChunk       = 50
 	defaultMaxChecksPerBatch = 50
 )
 

@@ -8,20 +8,20 @@ import (
 )
 
 // Create creates a new store.
-func (s *StoresService) Create(ctx context.Context, req *CreateStoreRequest, opts ...RequestOption) (*Store, *Response, error) {
+func (s *StoresService) Create(ctx context.Context, req *CreateStoreRequest, opts ...RequestOption) (*Store, error) {
 	rc := newRequestConfig()
 	applyOptions(rc, opts)
 	httpReq, err := s.client.newRequest(ctx, http.MethodPost, "/stores", req, rc.header)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	store := new(Store)
-	resp, err := s.client.Do(httpReq, store)
-	return store, resp, err
+	err = s.client.do(httpReq, store, rc)
+	return store, err
 }
 
 // List returns a page of stores.
-func (s *StoresService) List(ctx context.Context, opts *ListStoresOptions, ropts ...RequestOption) (*ListStoresResponse, *Response, error) {
+func (s *StoresService) List(ctx context.Context, opts *ListStoresOptions, ropts ...RequestOption) (*ListStoresResponse, error) {
 	rc := newRequestConfig()
 	applyOptions(rc, ropts)
 	path := "/stores"
@@ -42,33 +42,33 @@ func (s *StoresService) List(ctx context.Context, opts *ListStoresOptions, ropts
 	}
 	httpReq, err := s.client.newRequest(ctx, http.MethodGet, path, nil, rc.header)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	out := new(ListStoresResponse)
-	resp, err := s.client.Do(httpReq, out)
-	return out, resp, err
+	err = s.client.do(httpReq, out, rc)
+	return out, err
 }
 
 // Get retrieves a store by ID.
-func (s *StoresService) Get(ctx context.Context, storeID string, opts ...RequestOption) (*Store, *Response, error) {
+func (s *StoresService) Get(ctx context.Context, storeID string, opts ...RequestOption) (*Store, error) {
 	rc := newRequestConfig()
 	applyOptions(rc, opts)
 	httpReq, err := s.client.newRequest(ctx, http.MethodGet, "/stores/"+storeID, nil, rc.header)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	store := new(Store)
-	resp, err := s.client.Do(httpReq, store)
-	return store, resp, err
+	err = s.client.do(httpReq, store, rc)
+	return store, err
 }
 
 // Delete removes a store by ID.
-func (s *StoresService) Delete(ctx context.Context, storeID string, opts ...RequestOption) (*Response, error) {
+func (s *StoresService) Delete(ctx context.Context, storeID string, opts ...RequestOption) error {
 	rc := newRequestConfig()
 	applyOptions(rc, opts)
 	httpReq, err := s.client.newRequest(ctx, http.MethodDelete, "/stores/"+storeID, nil, rc.header)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return s.client.Do(httpReq, nil)
+	return s.client.do(httpReq, nil, rc)
 }

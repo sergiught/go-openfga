@@ -43,10 +43,12 @@ func (e *ErrorResponse) Error() string {
 	if e.Response != nil && e.Response.Request != nil {
 		u = e.Response.Request.Method + " " + e.Response.Request.URL.String()
 	}
-	return fmt.Sprintf("%s: %d %s %s", u, e.statusCode(), e.Code, e.Message)
+	return fmt.Sprintf("%s: %d %s %s", u, e.StatusCode(), e.Code, e.Message)
 }
 
-func (e *ErrorResponse) statusCode() int {
+// StatusCode returns the HTTP status code of the response that produced this
+// error, or 0 if the error carries no response.
+func (e *ErrorResponse) StatusCode() int {
 	if e.Response == nil {
 		return 0
 	}

@@ -21,11 +21,11 @@
 //	c.Relationships        // check, batch-check, expand, list-objects, list-users
 //	c.Assertions           // read/write test assertions
 //
-// Single-request methods return (result, *Response, error), where *Response
-// embeds the underlying *http.Response. The fan-out helpers
-// (Tuples.WriteTuples, Tuples.DeleteTuples, Relationships.BatchCheckAll,
-// Relationships.ListRelations) issue several requests and so do not return a
-// single *Response.
+// Methods return (result, error), or just error for write-only calls. To reach
+// the raw HTTP response (status, headers, request ID), pass the OnResponse
+// request option, which receives the *Response after the body is decoded. For
+// cross-cutting observation of every request, use WithRequestObserver; for full
+// manual control, use NewRequest and Do.
 //
 // # Common calls
 //

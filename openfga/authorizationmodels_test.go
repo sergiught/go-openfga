@@ -25,7 +25,7 @@ func TestModels_Write(t *testing.T) {
 	defer srv.Close()
 	c := testClient(t, srv.URL)
 	c.storeID = "s1"
-	out, _, err := c.AuthorizationModels.Write(context.Background(), &WriteAuthorizationModelRequest{SchemaVersion: "1.1"})
+	out, err := c.AuthorizationModels.Write(context.Background(), &WriteAuthorizationModelRequest{SchemaVersion: "1.1"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestModels_List_WithQueryParams(t *testing.T) {
 	defer srv.Close()
 	c := testClient(t, srv.URL)
 	c.storeID = "s1"
-	page, resp, err := c.AuthorizationModels.List(context.Background(), &ListModelsOptions{PageSize: 5, ContinuationToken: "tok"})
+	page, err := c.AuthorizationModels.List(context.Background(), &ListModelsOptions{PageSize: 5, ContinuationToken: "tok"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,8 +63,8 @@ func TestModels_List_WithQueryParams(t *testing.T) {
 	if page.AuthorizationModels[0].ID != "model-2" {
 		t.Errorf("id = %q", page.AuthorizationModels[0].ID)
 	}
-	if resp.ContinuationToken != "next" {
-		t.Errorf("token = %q", resp.ContinuationToken)
+	if page.ContinuationToken != "next" {
+		t.Errorf("token = %q", page.ContinuationToken)
 	}
 }
 
@@ -81,7 +81,7 @@ func TestModels_Get(t *testing.T) {
 	defer srv.Close()
 	c := testClient(t, srv.URL)
 	c.storeID = "s1"
-	m, _, err := c.AuthorizationModels.Get(context.Background(), "model-5")
+	m, err := c.AuthorizationModels.Get(context.Background(), "model-5")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestModels_ReadLatest(t *testing.T) {
 	defer srv.Close()
 	c := testClient(t, srv.URL)
 	c.storeID = "s1"
-	m, _, err := c.AuthorizationModels.ReadLatest(context.Background())
+	m, err := c.AuthorizationModels.ReadLatest(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func TestModels_ReadLatest_EmptyList(t *testing.T) {
 	defer srv.Close()
 	c := testClient(t, srv.URL)
 	c.storeID = "s1"
-	_, _, err := c.AuthorizationModels.ReadLatest(context.Background())
+	_, err := c.AuthorizationModels.ReadLatest(context.Background())
 	if err == nil {
 		t.Fatal("expected error for empty list, got nil")
 	}

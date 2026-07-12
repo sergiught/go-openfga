@@ -27,63 +27,71 @@ func (s *RelationshipsService) fillDefaults(opts []RequestOption, modelID *strin
 }
 
 // Check tests whether a user has a specific relation on an object.
-// It returns the check outcome, the raw HTTP response, and any error.
-func (s *RelationshipsService) Check(ctx context.Context, req *CheckRequest, opts ...RequestOption) (*CheckResponse, *Response, error) {
+// Pass OnResponse to observe the raw HTTP response.
+func (s *RelationshipsService) Check(ctx context.Context, req *CheckRequest, opts ...RequestOption) (*CheckResponse, error) {
 	r := *req
 	s.fillDefaults(opts, &r.AuthorizationModelID, &r.Consistency)
 	out := new(CheckResponse)
-	resp, err := s.client.doStorePost(ctx, "/check", &r, out, opts)
-	return out, resp, err
+	err := s.client.doStorePost(ctx, "/check", &r, out, opts)
+	return out, err
 }
 
 // Allowed is a convenience wrapper over Check for the common case: it reports
 // whether user has relation on object, using the client's default authorization
 // model and consistency. For contextual tuples, ABAC context, or a per-call
 // model, build a CheckRequest and call Check.
-func (s *RelationshipsService) Allowed(ctx context.Context, user, relation, object string, opts ...RequestOption) (bool, *Response, error) {
-	res, resp, err := s.Check(ctx, NewCheckRequest(user, relation, object), opts...)
+func (s *RelationshipsService) Allowed(ctx context.Context, user, relation, object string, opts ...RequestOption) (bool, error) {
+	res, err := s.Check(ctx, NewCheckRequest(user, relation, object), opts...)
 	if err != nil {
-		return false, resp, err
+		return false, err
 	}
-	return res.Allowed, resp, nil
+	return res.Allowed, nil
 }
 
 // BatchCheck runs multiple relationship checks in a single request. Results in
-// BatchCheckResponse.Result are keyed by the CorrelationID of each item.
-func (s *RelationshipsService) BatchCheck(ctx context.Context, req *BatchCheckRequest, opts ...RequestOption) (*BatchCheckResponse, *Response, error) {
+// BatchCheckResponse.Result are keyed by the CorrelationID of each item; items
+// that omit one get a generated ID (surfaced in the response), and duplicate
+// caller-supplied IDs are rejected before the request, since they would collide
+// in the result map.
+func (s *RelationshipsService) BatchCheck(ctx context.Context, req *BatchCheckRequest, opts ...RequestOption) (*BatchCheckResponse, error) {
 	r := *req
+	checks, err := prepareBatchCheckItems(r.Checks)
+	if err != nil {
+		return nil, err
+	}
+	r.Checks = checks
 	s.fillDefaults(opts, &r.AuthorizationModelID, &r.Consistency)
 	out := new(BatchCheckResponse)
-	resp, err := s.client.doStorePost(ctx, "/batch-check", &r, out, opts)
-	return out, resp, err
+	err = s.client.doStorePost(ctx, "/batch-check", &r, out, opts)
+	return out, err
 }
 
 // Expand returns the userset tree that proves a relationship.
-func (s *RelationshipsService) Expand(ctx context.Context, req *ExpandRequest, opts ...RequestOption) (*ExpandResponse, *Response, error) {
+func (s *RelationshipsService) Expand(ctx context.Context, req *ExpandRequest, opts ...RequestOption) (*ExpandResponse, error) {
 	r := *req
 	s.fillDefaults(opts, &r.AuthorizationModelID, &r.Consistency)
 	out := new(ExpandResponse)
-	resp, err := s.client.doStorePost(ctx, "/expand", &r, out, opts)
-	return out, resp, err
+	err := s.client.doStorePost(ctx, "/expand", &r, out, opts)
+	return out, err
 }
 
 // ListObjects returns all objects of a given type that a user has a specific
 // relation with.
-func (s *RelationshipsService) ListObjects(ctx context.Context, req *ListObjectsRequest, opts ...RequestOption) (*ListObjectsResponse, *Response, error) {
+func (s *RelationshipsService) ListObjects(ctx context.Context, req *ListObjectsRequest, opts ...RequestOption) (*ListObjectsResponse, error) {
 	r := *req
 	s.fillDefaults(opts, &r.AuthorizationModelID, &r.Consistency)
 	out := new(ListObjectsResponse)
-	resp, err := s.client.doStorePost(ctx, "/list-objects", &r, out, opts)
-	return out, resp, err
+	err := s.client.doStorePost(ctx, "/list-objects", &r, out, opts)
+	return out, err
 }
 
 // ListUsers returns all users who have a specific relation with a given object.
-func (s *RelationshipsService) ListUsers(ctx context.Context, req *ListUsersRequest, opts ...RequestOption) (*ListUsersResponse, *Response, error) {
+func (s *RelationshipsService) ListUsers(ctx context.Context, req *ListUsersRequest, opts ...RequestOption) (*ListUsersResponse, error) {
 	r := *req
 	s.fillDefaults(opts, &r.AuthorizationModelID, &r.Consistency)
 	out := new(ListUsersResponse)
-	resp, err := s.client.doStorePost(ctx, "/list-users", &r, out, opts)
-	return out, resp, err
+	err := s.client.doStorePost(ctx, "/list-users", &r, out, opts)
+	return out, err
 }
 
 // StreamedListObjects streams matching objects, decoding the NDJSON response
@@ -135,6 +143,30 @@ func newCorrelationID() (string, error) {
 	return hex.EncodeToString(b[:]), nil
 }
 
+// prepareBatchCheckItems returns a copy of items with every item assigned a
+// correlation ID: those that omit one get a generated ID, and duplicate
+// caller-supplied IDs are rejected because BatchCheck keys its result map by
+// correlation ID, so collisions would silently drop results. The returned
+// slice never shares backing state with items.
+func prepareBatchCheckItems(items []BatchCheckItem) ([]BatchCheckItem, error) {
+	out := make([]BatchCheckItem, len(items))
+	seen := make(map[string]struct{}, len(items))
+	for i, item := range items {
+		if item.CorrelationID == "" {
+			id, err := newCorrelationID()
+			if err != nil {
+				return nil, err
+			}
+			item.CorrelationID = id
+		} else if _, dup := seen[item.CorrelationID]; dup {
+			return nil, fmt.Errorf("openfga: duplicate correlation_id %q", item.CorrelationID)
+		}
+		seen[item.CorrelationID] = struct{}{}
+		out[i] = item
+	}
+	return out, nil
+}
+
 // BatchCheckAll runs many checks by splitting req.Checks into chunks of at most
 // WithMaxChecksPerBatch (default 50, the server maximum) and issuing the native
 // /batch-check requests concurrently (bounded by WithMaxParallel). Results from
@@ -167,21 +199,9 @@ func (s *RelationshipsService) BatchCheckAll(ctx context.Context, req *BatchChec
 	cons := req.Consistency
 	s.fillDefaults(opts, &modelID, &cons)
 
-	// Copy checks, populating/validating correlation IDs.
-	checks := make([]BatchCheckItem, len(req.Checks))
-	seen := make(map[string]struct{}, len(req.Checks))
-	for i, item := range req.Checks {
-		if item.CorrelationID == "" {
-			id, err := newCorrelationID()
-			if err != nil {
-				return nil, err
-			}
-			item.CorrelationID = id
-		} else if _, dup := seen[item.CorrelationID]; dup {
-			return nil, fmt.Errorf("openfga: duplicate correlation_id %q in BatchCheckAll", item.CorrelationID)
-		}
-		seen[item.CorrelationID] = struct{}{}
-		checks[i] = item
+	checks, err := prepareBatchCheckItems(req.Checks)
+	if err != nil {
+		return nil, err
 	}
 
 	perBatch := resolvePositive(rc.maxChecksPerBatch, defaultMaxChecksPerBatch)

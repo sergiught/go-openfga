@@ -18,7 +18,7 @@ func registerStoresSteps(sc *godog.ScenarioContext, st *suiteState) {
 
 // createStore creates a store and records its ID. Action step.
 func (st *suiteState) createStore(ctx context.Context, name string) error {
-	store, _, err := st.client.Stores.Create(ctx, &openfga.CreateStoreRequest{Name: name})
+	store, err := st.client.Stores.Create(ctx, &openfga.CreateStoreRequest{Name: name})
 	st.lastErr = err
 	if store != nil {
 		st.lastStoreID = store.ID
@@ -30,7 +30,7 @@ func (st *suiteState) readStoreBack(ctx context.Context) error {
 	if st.lastErr != nil {
 		return fmt.Errorf("create errored: %w", st.lastErr)
 	}
-	got, _, err := st.client.Stores.Get(ctx, st.lastStoreID)
+	got, err := st.client.Stores.Get(ctx, st.lastStoreID)
 	if err != nil {
 		return err
 	}
@@ -55,14 +55,14 @@ func (st *suiteState) allStoresInclude(ctx context.Context) error {
 }
 
 func (st *suiteState) deleteThatStore(ctx context.Context) error {
-	_, err := st.client.Stores.Delete(ctx, st.lastStoreID)
+	err := st.client.Stores.Delete(ctx, st.lastStoreID)
 	st.lastErr = err
 	return nil
 }
 
 // getThatStore fetches the last-created store; captures the error for assertion.
 func (st *suiteState) getThatStore(ctx context.Context) error {
-	_, _, err := st.client.Stores.Get(ctx, st.lastStoreID)
+	_, err := st.client.Stores.Get(ctx, st.lastStoreID)
 	st.lastErr = err
 	return nil
 }

@@ -44,8 +44,8 @@ authentication, retries, and custom headers are layered as composable
 - **DSL transformer** — the optional `dsl` module converts models between DSL and JSON.
 - **Streaming** — `StreamedListObjects` yields results from the NDJSON endpoint as they
   arrive.
-- **Configurable retries** — exponential backoff with full jitter, on by default for
-  HTTP 429, honoring `Retry-After`; 5xx is opt-in.
+- **Configurable retries** — exponential backoff with equal jitter, on by default for
+  HTTP 429 and transient network errors, honoring `Retry-After`; 5xx is opt-in.
 - **Typed errors** — `*ValidationError`, `*AuthenticationError`, `*NotFoundError`,
   `*RateLimitError`, `*InternalError`, all reachable via `errors.As`.
 - **Composable transport** — layer tracing/metrics/logging under the auth+retry
@@ -88,7 +88,7 @@ func main() {
 		panic(err)
 	}
 
-	allowed, _, err := client.Relationships.Allowed(
+	allowed, err := client.Relationships.Allowed(
 		context.Background(), "user:anne", "reader", "document:budget")
 	var notFound *openfga.NotFoundError
 	switch {
@@ -106,11 +106,23 @@ func main() {
 context, or a per-call model, build a `CheckRequest` (optionally with
 `openfga.NewCheckRequest`) and call `Check`.
 
-Every typed method returns `(result, *Response, error)` (or `(*Response, error)` for
-writes), where `*Response` wraps the underlying `*http.Response` so you can inspect
-status codes, headers, and the server request ID via `resp.RequestID()`. The
-fan-out helpers (`WriteTuples`, `DeleteTuples`, `BatchCheckAll`, `ListRelations`)
-issue several requests and so do not return a single `*Response`.
+Every typed method returns `(result, error)` (or just `error` for writes). To
+reach the raw HTTP response — status, headers, or the server request ID — pass
+the `openfga.OnResponse` option, which hands your callback the `*Response` after
+the body is decoded:
+
+```go
+allowed, err := client.Relationships.Allowed(ctx, "user:anne", "reader", "document:budget",
+	openfga.OnResponse(func(r *openfga.Response) {
+		log.Println("request id:", r.RequestID(), "status:", r.StatusCode)
+	}))
+```
+
+`OnResponse` fires even on API errors, so you can read headers off a failure. For
+cross-cutting observation of every request use `WithRequestObserver`; for full
+manual control use `NewRequest` + `Do`. The fan-out helpers (`WriteTuples`,
+`DeleteTuples`, `BatchCheckAll`, `ListRelations`) issue several requests and do
+not invoke `OnResponse`.
 
 ## Authentication
 
@@ -207,11 +219,14 @@ _, err := client.Tuples.Write(ctx, &openfga.WriteRequest{
 `WriteTuples` and `DeleteTuples` accept arbitrarily large slices. By default they
 split the input into non-transactional chunks issued in parallel, so one chunk
 failing doesn't roll back the rest. The response reports a per-tuple outcome
-(order matches the input):
+(order matches the input). Each chunk is one server-side atomic write, so a chunk
+that fails marks all of its tuples failed with the same error — larger chunks
+trade per-tuple attribution for fewer requests; use `WithMaxPerChunk(1)` for
+exact attribution:
 
 ```go
 resp, err := client.Tuples.WriteTuples(ctx, keys,
-	openfga.WithMaxPerChunk(20),  // tuples per request (default 1)
+	openfga.WithMaxPerChunk(50),  // tuples per request (default 50)
 	openfga.WithMaxParallel(10),  // concurrent requests (default 10)
 )
 if err != nil {
@@ -369,7 +384,7 @@ reachable with `errors.As`:
 | `*InternalError` | 5xx |
 
 ```go
-allowed, _, err := client.Relationships.Allowed(ctx, "user:anne", "reader", "document:budget")
+allowed, err := client.Relationships.Allowed(ctx, "user:anne", "reader", "document:budget")
 
 var rl *openfga.RateLimitError
 switch {

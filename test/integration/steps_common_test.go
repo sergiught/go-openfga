@@ -21,14 +21,14 @@ func registerCommonSteps(sc *godog.ScenarioContext, st *suiteState) {
 // freshStore creates a new store, binds the client to it, and writes the shared
 // authorization model. Setup step: returns its error to abort on failure.
 func (st *suiteState) freshStore(ctx context.Context) error {
-	store, _, err := st.client.Stores.Create(ctx, &openfga.CreateStoreRequest{Name: "bdd"})
+	store, err := st.client.Stores.Create(ctx, &openfga.CreateStoreRequest{Name: "bdd"})
 	if err != nil {
 		return err
 	}
 	st.storeID = store.ID
 	st.client = mustWithStore(st.baseURL, store.ID)
 
-	wm, _, err := st.client.AuthorizationModels.Write(ctx, sharedModel())
+	wm, err := st.client.AuthorizationModels.Write(ctx, sharedModel())
 	if err != nil {
 		return err
 	}
@@ -38,7 +38,7 @@ func (st *suiteState) freshStore(ctx context.Context) error {
 
 // writeTuple grants a relationship. Setup step: returns its error.
 func (st *suiteState) writeTuple(ctx context.Context, user, relation, object string) error {
-	_, err := st.client.Tuples.Write(ctx, &openfga.WriteRequest{
+	err := st.client.Tuples.Write(ctx, &openfga.WriteRequest{
 		AuthorizationModelID: st.modelID,
 		Writes: &openfga.WriteRequestTuples{TupleKeys: []openfga.TupleKey{
 			{User: user, Relation: relation, Object: object},

@@ -39,7 +39,7 @@ func TestAssertions_WriteAndRead(t *testing.T) {
 			},
 		},
 	}
-	if _, err := c.Assertions.Write(context.Background(), "model-1", writeReq); err != nil {
+	if err := c.Assertions.Write(context.Background(), "model-1", writeReq); err != nil {
 		t.Fatalf("Write: %v", err)
 	}
 
@@ -55,7 +55,7 @@ func TestAssertions_WriteAndRead(t *testing.T) {
 		t.Errorf("server received expectation = false, want true")
 	}
 
-	out, _, err := c.Assertions.Read(context.Background(), "model-1")
+	out, err := c.Assertions.Read(context.Background(), "model-1")
 	if err != nil {
 		t.Fatalf("Read: %v", err)
 	}

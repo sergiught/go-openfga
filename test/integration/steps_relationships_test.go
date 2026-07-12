@@ -56,7 +56,7 @@ func (st *suiteState) grantedRelationsAre(expectedCSV string) error {
 
 // check performs a Check. Action step: captures error into st.lastErr.
 func (st *suiteState) check(ctx context.Context, user, relation, object string) error {
-	out, _, err := st.client.Relationships.Check(ctx, &openfga.CheckRequest{
+	out, err := st.client.Relationships.Check(ctx, &openfga.CheckRequest{
 		AuthorizationModelID: st.modelID,
 		TupleKey:             openfga.CheckRequestTupleKey{User: user, Relation: relation, Object: object},
 	})
@@ -74,7 +74,7 @@ func (st *suiteState) addBatchItem(correlation, user, relation, object string) e
 }
 
 func (st *suiteState) runBatchCheck(ctx context.Context) error {
-	out, _, err := st.client.Relationships.BatchCheck(ctx, &openfga.BatchCheckRequest{
+	out, err := st.client.Relationships.BatchCheck(ctx, &openfga.BatchCheckRequest{
 		AuthorizationModelID: st.modelID,
 		Checks:               st.batchItems,
 	})
@@ -106,7 +106,7 @@ func (st *suiteState) assertBatch(correlation string, want bool) error {
 }
 
 func (st *suiteState) expandRelation(ctx context.Context, relation, object string) error {
-	out, _, err := st.client.Relationships.Expand(ctx, &openfga.ExpandRequest{
+	out, err := st.client.Relationships.Expand(ctx, &openfga.ExpandRequest{
 		AuthorizationModelID: st.modelID,
 		TupleKey:             openfga.CheckRequestTupleKey{Relation: relation, Object: object},
 	})
@@ -126,7 +126,7 @@ func (st *suiteState) expandNotEmpty() error {
 }
 
 func (st *suiteState) listObjects(ctx context.Context, typ, user, relation string) error {
-	out, _, err := st.client.Relationships.ListObjects(ctx, &openfga.ListObjectsRequest{
+	out, err := st.client.Relationships.ListObjects(ctx, &openfga.ListObjectsRequest{
 		AuthorizationModelID: st.modelID,
 		Type:                 typ,
 		Relation:             relation,
@@ -178,7 +178,7 @@ func (st *suiteState) objectsExclude(object string) error {
 }
 
 func (st *suiteState) listUsers(ctx context.Context, typ, relation, object string) error {
-	out, _, err := st.client.Relationships.ListUsers(ctx, &openfga.ListUsersRequest{
+	out, err := st.client.Relationships.ListUsers(ctx, &openfga.ListUsersRequest{
 		AuthorizationModelID: st.modelID,
 		Object:               openfga.FGAObjectRelation{Object: object},
 		Relation:             relation,
@@ -212,7 +212,7 @@ func (st *suiteState) usersInclude(want string) error {
 }
 
 func (st *suiteState) checkWithContextualTuple(ctx context.Context, user, relation, object, cu, cr, co string) error {
-	out, _, err := st.client.Relationships.Check(ctx, &openfga.CheckRequest{
+	out, err := st.client.Relationships.Check(ctx, &openfga.CheckRequest{
 		AuthorizationModelID: st.modelID,
 		TupleKey:             openfga.CheckRequestTupleKey{User: user, Relation: relation, Object: object},
 		ContextualTuples: &openfga.ContextualTupleKeys{TupleKeys: []openfga.TupleKey{

@@ -9,29 +9,29 @@ import (
 )
 
 // Write creates a new authorization model in the store and returns its ID.
-func (s *AuthorizationModelsService) Write(ctx context.Context, req *WriteAuthorizationModelRequest, opts ...RequestOption) (*WriteAuthorizationModelResponse, *Response, error) {
+func (s *AuthorizationModelsService) Write(ctx context.Context, req *WriteAuthorizationModelRequest, opts ...RequestOption) (*WriteAuthorizationModelResponse, error) {
 	rc := newRequestConfig()
 	applyOptions(rc, opts)
 	store, err := s.client.storeFor(rc)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	httpReq, err := s.client.newRequest(ctx, http.MethodPost, "/stores/"+store+"/authorization-models", req, rc.header)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	out := new(WriteAuthorizationModelResponse)
-	resp, err := s.client.Do(httpReq, out)
-	return out, resp, err
+	err = s.client.do(httpReq, out, rc)
+	return out, err
 }
 
 // List returns a page of authorization models for the store.
-func (s *AuthorizationModelsService) List(ctx context.Context, opts *ListModelsOptions, ropts ...RequestOption) (*ListAuthorizationModelsResponse, *Response, error) {
+func (s *AuthorizationModelsService) List(ctx context.Context, opts *ListModelsOptions, ropts ...RequestOption) (*ListAuthorizationModelsResponse, error) {
 	rc := newRequestConfig()
 	applyOptions(rc, ropts)
 	store, err := s.client.storeFor(rc)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	path := "/stores/" + store + "/authorization-models"
 	if opts != nil {
@@ -48,42 +48,41 @@ func (s *AuthorizationModelsService) List(ctx context.Context, opts *ListModelsO
 	}
 	httpReq, err := s.client.newRequest(ctx, http.MethodGet, path, nil, rc.header)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	out := new(ListAuthorizationModelsResponse)
-	resp, err := s.client.Do(httpReq, out)
-	return out, resp, err
+	err = s.client.do(httpReq, out, rc)
+	return out, err
 }
 
 // Get retrieves a single authorization model by ID.
-func (s *AuthorizationModelsService) Get(ctx context.Context, id string, opts ...RequestOption) (*AuthorizationModel, *Response, error) {
+func (s *AuthorizationModelsService) Get(ctx context.Context, id string, opts ...RequestOption) (*AuthorizationModel, error) {
 	rc := newRequestConfig()
 	applyOptions(rc, opts)
 	store, err := s.client.storeFor(rc)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	httpReq, err := s.client.newRequest(ctx, http.MethodGet, "/stores/"+store+"/authorization-models/"+id, nil, rc.header)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	out := new(readAuthorizationModelResponse)
-	resp, err := s.client.Do(httpReq, out)
-	if err != nil {
-		return nil, resp, err
+	if err := s.client.do(httpReq, out, rc); err != nil {
+		return nil, err
 	}
-	return &out.AuthorizationModel, resp, nil
+	return &out.AuthorizationModel, nil
 }
 
 // ReadLatest returns the most recently created authorization model by fetching
 // one page of size 1. It returns an error if no models exist in the store.
-func (s *AuthorizationModelsService) ReadLatest(ctx context.Context, opts ...RequestOption) (*AuthorizationModel, *Response, error) {
-	page, resp, err := s.List(ctx, &ListModelsOptions{PageSize: 1}, opts...)
+func (s *AuthorizationModelsService) ReadLatest(ctx context.Context, opts ...RequestOption) (*AuthorizationModel, error) {
+	page, err := s.List(ctx, &ListModelsOptions{PageSize: 1}, opts...)
 	if err != nil {
-		return nil, resp, err
+		return nil, err
 	}
 	if len(page.AuthorizationModels) == 0 {
-		return nil, resp, errors.New("openfga: no authorization models found")
+		return nil, errors.New("openfga: no authorization models found")
 	}
-	return &page.AuthorizationModels[0], resp, nil
+	return &page.AuthorizationModels[0], nil
 }

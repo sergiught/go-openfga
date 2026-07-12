@@ -36,7 +36,7 @@ func ExampleRelationshipsService_Check() {
 		panic(err)
 	}
 
-	resp, _, err := client.Relationships.Check(context.Background(), &openfga.CheckRequest{
+	resp, err := client.Relationships.Check(context.Background(), &openfga.CheckRequest{
 		TupleKey: openfga.CheckRequestTupleKey{
 			User:     "user:anne",
 			Relation: "reader",
@@ -82,7 +82,7 @@ func ExampleRelationshipsService_Allowed() {
 		panic(err)
 	}
 
-	ok, _, err := client.Relationships.Allowed(
+	ok, err := client.Relationships.Allowed(
 		context.Background(), "user:anne", "reader", "document:budget")
 	if err != nil {
 		fmt.Println("error:", err)
@@ -147,7 +147,7 @@ func Example_errorHandling() {
 		panic(err)
 	}
 
-	_, _, err = client.Relationships.Allowed(
+	_, err = client.Relationships.Allowed(
 		context.Background(), "user:anne", "reader", "document:budget")
 
 	var rl *openfga.RateLimitError

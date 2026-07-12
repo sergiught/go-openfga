@@ -16,7 +16,7 @@ func (s *StoresService) All(ctx context.Context, opts *ListStoresOptions, ropts 
 	}
 	return func(yield func(Store, error) bool) {
 		for {
-			page, _, err := s.List(ctx, &o, ropts...)
+			page, err := s.List(ctx, &o, ropts...)
 			if err != nil {
 				yield(Store{}, err)
 				return
@@ -43,7 +43,7 @@ func (s *AuthorizationModelsService) All(ctx context.Context, opts *ListModelsOp
 	}
 	return func(yield func(AuthorizationModel, error) bool) {
 		for {
-			page, _, err := s.List(ctx, &o, ropts...)
+			page, err := s.List(ctx, &o, ropts...)
 			if err != nil {
 				yield(AuthorizationModel{}, err)
 				return
@@ -70,7 +70,7 @@ func (s *TuplesService) ReadAll(ctx context.Context, req *ReadRequest, ropts ...
 	}
 	return func(yield func(Tuple, error) bool) {
 		for {
-			page, _, err := s.Read(ctx, &r, ropts...)
+			page, err := s.Read(ctx, &r, ropts...)
 			if err != nil {
 				yield(Tuple{}, err)
 				return
@@ -105,7 +105,7 @@ func (s *TuplesService) ChangesAll(ctx context.Context, opts *ReadChangesOptions
 	return func(yield func(TupleChange, error) bool) {
 		for {
 			sentToken := o.ContinuationToken
-			page, _, err := s.ReadChanges(ctx, &o, ropts...)
+			page, err := s.ReadChanges(ctx, &o, ropts...)
 			if err != nil {
 				yield(TupleChange{}, err)
 				return

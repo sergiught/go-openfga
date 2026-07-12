@@ -20,18 +20,18 @@ func registerOptionsSteps(sc *godog.ScenarioContext, st *suiteState) {
 
 // secondStore provisions an independent store+model and seeds one grant. Setup step.
 func (st *suiteState) secondStore(ctx context.Context, user, relation, object string) error {
-	store, _, err := st.client.Stores.Create(ctx, &openfga.CreateStoreRequest{Name: "second"})
+	store, err := st.client.Stores.Create(ctx, &openfga.CreateStoreRequest{Name: "second"})
 	if err != nil {
 		return err
 	}
 	st.secondStoreID = store.ID
 	sc := mustWithStore(st.baseURL, store.ID)
-	wm, _, err := sc.AuthorizationModels.Write(ctx, sharedModel())
+	wm, err := sc.AuthorizationModels.Write(ctx, sharedModel())
 	if err != nil {
 		return err
 	}
 	st.secondModelID = wm.AuthorizationModelID
-	_, err = sc.Tuples.Write(ctx, &openfga.WriteRequest{
+	err = sc.Tuples.Write(ctx, &openfga.WriteRequest{
 		AuthorizationModelID: st.secondModelID,
 		Writes: &openfga.WriteRequestTuples{TupleKeys: []openfga.TupleKey{
 			{User: user, Relation: relation, Object: object},
@@ -43,7 +43,7 @@ func (st *suiteState) secondStore(ctx context.Context, user, relation, object st
 // checkWithOverrides uses the Background client (bound to the first store) but
 // targets the second store and model via per-request options.
 func (st *suiteState) checkWithOverrides(ctx context.Context, user, relation, object string) error {
-	out, _, err := st.client.Relationships.Check(ctx, &openfga.CheckRequest{
+	out, err := st.client.Relationships.Check(ctx, &openfga.CheckRequest{
 		TupleKey: openfga.CheckRequestTupleKey{User: user, Relation: relation, Object: object},
 	}, openfga.WithStore(st.secondStoreID), openfga.WithAuthorizationModel(st.secondModelID))
 	st.lastErr = err
@@ -52,7 +52,7 @@ func (st *suiteState) checkWithOverrides(ctx context.Context, user, relation, ob
 }
 
 func (st *suiteState) checkWithConsistency(ctx context.Context, user, relation, object string) error {
-	out, _, err := st.client.Relationships.Check(ctx, &openfga.CheckRequest{
+	out, err := st.client.Relationships.Check(ctx, &openfga.CheckRequest{
 		AuthorizationModelID: st.modelID,
 		TupleKey:             openfga.CheckRequestTupleKey{User: user, Relation: relation, Object: object},
 	}, openfga.WithConsistency(openfga.ConsistencyHigherConsistency))
@@ -62,7 +62,7 @@ func (st *suiteState) checkWithConsistency(ctx context.Context, user, relation, 
 }
 
 func (st *suiteState) checkWithHeader(ctx context.Context, user, relation, object string) error {
-	out, _, err := st.client.Relationships.Check(ctx, &openfga.CheckRequest{
+	out, err := st.client.Relationships.Check(ctx, &openfga.CheckRequest{
 		AuthorizationModelID: st.modelID,
 		TupleKey:             openfga.CheckRequestTupleKey{User: user, Relation: relation, Object: object},
 	}, openfga.WithRequestHeader("X-Custom-Test", "integration"))
@@ -78,7 +78,7 @@ func (st *suiteState) readTuplesUnbound(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	_, _, st.lastErr = c.Tuples.Read(ctx, &openfga.ReadRequest{})
+	_, st.lastErr = c.Tuples.Read(ctx, &openfga.ReadRequest{})
 	return nil
 }
 

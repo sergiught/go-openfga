@@ -16,7 +16,7 @@ func registerModelsSteps(sc *godog.ScenarioContext, st *suiteState) {
 }
 
 func (st *suiteState) readModelBack(ctx context.Context) error {
-	m, _, err := st.client.AuthorizationModels.Get(ctx, st.modelID)
+	m, err := st.client.AuthorizationModels.Get(ctx, st.modelID)
 	if err != nil {
 		return err
 	}
@@ -27,7 +27,7 @@ func (st *suiteState) readModelBack(ctx context.Context) error {
 }
 
 func (st *suiteState) readLatestModel(ctx context.Context) error {
-	m, _, err := st.client.AuthorizationModels.ReadLatest(ctx)
+	m, err := st.client.AuthorizationModels.ReadLatest(ctx)
 	if err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func (st *suiteState) listAllModels(ctx context.Context) error {
 // writeInvalidModel writes a model whose viewer references a relation that does
 // not exist, which the server rejects with 400. Action step.
 func (st *suiteState) writeInvalidModel(ctx context.Context) error {
-	_, _, err := st.client.AuthorizationModels.Write(ctx, &openfga.WriteAuthorizationModelRequest{
+	_, err := st.client.AuthorizationModels.Write(ctx, &openfga.WriteAuthorizationModelRequest{
 		SchemaVersion: "1.1",
 		TypeDefinitions: []openfga.TypeDefinition{
 			{Type: "user"},

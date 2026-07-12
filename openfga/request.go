@@ -25,6 +25,8 @@ type requestConfig struct {
 	transaction       bool
 	onDuplicate       OnDuplicate
 	onMissing         OnMissing
+
+	onResponse func(*Response)
 }
 
 func newRequestConfig() *requestConfig { return &requestConfig{header: http.Header{}} }
@@ -145,6 +147,25 @@ func (c *Client) Do(req *http.Request, v any) (*Response, error) {
 	return resp, nil
 }
 
+// do executes req, decodes the body into out, invokes rc's OnResponse callback
+// when a response was received, and returns only the error. It backs the typed
+// service methods, whose public surface is (result, error); callers that need
+// the raw *Response reach it via OnResponse.
+func (c *Client) do(req *http.Request, out any, rc *requestConfig) error {
+	resp, err := c.Do(req, out)
+	fireOnResponse(rc, resp)
+	return err
+}
+
+// fireOnResponse invokes rc's OnResponse callback if one is set and a response
+// was received (resp is non-nil even on API errors, so callbacks can inspect
+// headers on a failure).
+func fireOnResponse(rc *requestConfig, resp *Response) {
+	if rc.onResponse != nil && resp != nil {
+		rc.onResponse(resp)
+	}
+}
+
 // WithMaxParallel caps the number of concurrent HTTP requests issued by
 // Tuples.WriteTuples, Tuples.DeleteTuples, and Relationships.BatchCheckAll.
 // Non-positive values fall back to the default (10). Other methods ignore it.
@@ -154,7 +175,13 @@ func WithMaxParallel(n int) RequestOption {
 
 // WithMaxPerChunk sets how many tuples go into each non-transactional request
 // issued by Tuples.WriteTuples / Tuples.DeleteTuples. Non-positive values fall
-// back to the default (1). Ignored by other methods and when WithTransaction is set.
+// back to the default (50). Ignored by other methods and when WithTransaction
+// is set.
+//
+// Each chunk is one server-side atomic /write, so if any tuple in a chunk
+// fails, every tuple in that chunk is reported failed with the same error.
+// Larger chunks mean fewer requests but coarser per-tuple attribution on
+// failure; pass WithMaxPerChunk(1) for exact per-tuple results.
 func WithMaxPerChunk(n int) RequestOption {
 	return func(rc *requestConfig) { rc.maxPerChunk = n }
 }
@@ -182,4 +209,22 @@ func WithOnDuplicate(v OnDuplicate) RequestOption {
 // issued by Tuples.DeleteTuples. Other methods ignore it.
 func WithOnMissing(v OnMissing) RequestOption {
 	return func(rc *requestConfig) { rc.onMissing = v }
+}
+
+// OnResponse registers a callback invoked with the raw *Response of a single
+// call, after the body is decoded. Use it on the (result, error) surface to
+// reach status, headers, the request ID, or the continuation token without
+// threading the response through the return signature:
+//
+//	res, err := client.Relationships.Check(ctx, req,
+//		openfga.OnResponse(func(r *openfga.Response) {
+//			log.Println("request id:", r.RequestID())
+//		}))
+//
+// It fires whenever a response is received — including on API errors, so the
+// callback can inspect headers on a failure. The fan-out helpers
+// (Tuples.WriteTuples, Tuples.DeleteTuples, Relationships.BatchCheckAll,
+// Relationships.ListRelations) issue several requests and do not invoke it.
+func OnResponse(fn func(*Response)) RequestOption {
+	return func(rc *requestConfig) { rc.onResponse = fn }
 }

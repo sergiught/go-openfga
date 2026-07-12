@@ -15,7 +15,7 @@ func registerAssertionsSteps(sc *godog.ScenarioContext, st *suiteState) {
 }
 
 func (st *suiteState) writeAssertion(ctx context.Context, user, relation, object, expect string) error {
-	_, err := st.client.Assertions.Write(ctx, st.modelID, &openfga.WriteAssertionsRequest{
+	err := st.client.Assertions.Write(ctx, st.modelID, &openfga.WriteAssertionsRequest{
 		Assertions: []openfga.Assertion{{
 			TupleKey:    openfga.CheckRequestTupleKey{User: user, Relation: relation, Object: object},
 			Expectation: expect == "true",
@@ -29,7 +29,7 @@ func (st *suiteState) readAssertions(ctx context.Context) error {
 	if st.lastErr != nil {
 		return fmt.Errorf("write assertions errored: %w", st.lastErr)
 	}
-	out, _, err := st.client.Assertions.Read(ctx, st.modelID)
+	out, err := st.client.Assertions.Read(ctx, st.modelID)
 	if err != nil {
 		return err
 	}

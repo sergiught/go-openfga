@@ -49,7 +49,7 @@ type BatchCheckItem struct {
 	TupleKey         CheckRequestTupleKey `json:"tuple_key"`
 	ContextualTuples *ContextualTupleKeys `json:"contextual_tuples,omitempty"`
 	Context          map[string]any       `json:"context,omitempty"`
-	CorrelationID    string               `json:"correlation_id"`
+	CorrelationID    string               `json:"correlation_id,omitempty"`
 }
 
 // BatchCheckRequest is the body for Relationships.BatchCheck.

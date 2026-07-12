@@ -31,7 +31,7 @@ func TestRelationships_Check(t *testing.T) {
 	defer srv.Close()
 	c := testClient(t, srv.URL)
 	c.storeID = "s1"
-	out, _, err := c.Relationships.Check(context.Background(), &CheckRequest{
+	out, err := c.Relationships.Check(context.Background(), &CheckRequest{
 		TupleKey: CheckRequestTupleKey{User: "user:anne", Relation: "reader", Object: "doc:1"},
 	}, WithConsistency(ConsistencyHigherConsistency))
 	if err != nil {
@@ -57,7 +57,7 @@ func TestRelationships_Check_AppliesDefaultConsistency(t *testing.T) {
 	c := testClient(t, srv.URL)
 	c.storeID = "s1"
 	c.consistency = ConsistencyHigherConsistency
-	_, _, err := c.Relationships.Check(context.Background(), &CheckRequest{
+	_, err := c.Relationships.Check(context.Background(), &CheckRequest{
 		TupleKey: CheckRequestTupleKey{User: "user:anne", Relation: "reader", Object: "doc:1"},
 	})
 	if err != nil {
@@ -79,7 +79,7 @@ func TestRelationships_Check_DoesNotMutateRequest(t *testing.T) {
 	req := &CheckRequest{
 		TupleKey: CheckRequestTupleKey{User: "user:anne", Relation: "reader", Object: "doc:1"},
 	}
-	_, _, err := c.Relationships.Check(context.Background(), req, WithConsistency(ConsistencyMinimizeLatency))
+	_, err := c.Relationships.Check(context.Background(), req, WithConsistency(ConsistencyMinimizeLatency))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestRelationships_BatchCheckKeyedByCorrelationID(t *testing.T) {
 	defer srv.Close()
 	c := testClient(t, srv.URL)
 	c.storeID = "s1"
-	out, _, err := c.Relationships.BatchCheck(context.Background(), &BatchCheckRequest{
+	out, err := c.Relationships.BatchCheck(context.Background(), &BatchCheckRequest{
 		Checks: []BatchCheckItem{
 			{CorrelationID: "id-1"},
 			{CorrelationID: "id-2"},
@@ -125,6 +125,55 @@ func TestRelationships_BatchCheckKeyedByCorrelationID(t *testing.T) {
 	}
 	if len(gotBody.Checks) != 2 {
 		t.Errorf("body.Checks len = %d, want 2", len(gotBody.Checks))
+	}
+}
+
+func TestRelationships_BatchCheckGeneratesMissingCorrelationIDs(t *testing.T) {
+	var gotBody BatchCheckRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&gotBody)
+		out := BatchCheckResponse{Result: map[string]BatchCheckSingleResult{}}
+		for _, item := range gotBody.Checks {
+			if item.CorrelationID == "" {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			out.Result[item.CorrelationID] = BatchCheckSingleResult{Allowed: true}
+		}
+		_ = json.NewEncoder(w).Encode(out)
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(srv.URL, WithStoreID(testStoreID))
+	out, err := c.Relationships.BatchCheck(context.Background(), &BatchCheckRequest{
+		Checks: []BatchCheckItem{
+			{TupleKey: CheckRequestTupleKey{User: "user:a", Relation: "reader", Object: "doc:1"}},
+			{TupleKey: CheckRequestTupleKey{User: "user:b", Relation: "reader", Object: "doc:2"}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, item := range gotBody.Checks {
+		if item.CorrelationID == "" {
+			t.Errorf("check %d sent an empty correlation_id", i)
+		}
+	}
+	if len(out.Result) != 2 {
+		t.Errorf("results = %d, want 2", len(out.Result))
+	}
+}
+
+func TestRelationships_BatchCheckRejectsDuplicateCorrelationIDs(t *testing.T) {
+	c, _ := NewClient("http://example.invalid", WithStoreID(testStoreID))
+	_, err := c.Relationships.BatchCheck(context.Background(), &BatchCheckRequest{
+		Checks: []BatchCheckItem{
+			{CorrelationID: "dup"},
+			{CorrelationID: "dup"},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected error on duplicate correlation IDs")
 	}
 }
 
@@ -145,7 +194,7 @@ func TestRelationships_ListObjects(t *testing.T) {
 	defer srv.Close()
 	c := testClient(t, srv.URL)
 	c.storeID = "s1"
-	out, _, err := c.Relationships.ListObjects(context.Background(), &ListObjectsRequest{
+	out, err := c.Relationships.ListObjects(context.Background(), &ListObjectsRequest{
 		Type: "doc", Relation: "reader", User: "user:anne",
 	})
 	if err != nil {
@@ -172,7 +221,7 @@ func TestRelationships_Expand(t *testing.T) {
 	defer srv.Close()
 	c := testClient(t, srv.URL)
 	c.storeID = "s1"
-	out, _, err := c.Relationships.Expand(context.Background(), &ExpandRequest{
+	out, err := c.Relationships.Expand(context.Background(), &ExpandRequest{
 		TupleKey: CheckRequestTupleKey{User: "user:anne", Relation: "reader", Object: "doc:1"},
 	})
 	if err != nil {
@@ -200,7 +249,7 @@ func TestRelationships_ListUsers(t *testing.T) {
 	defer srv.Close()
 	c := testClient(t, srv.URL)
 	c.storeID = "s1"
-	out, _, err := c.Relationships.ListUsers(context.Background(), &ListUsersRequest{
+	out, err := c.Relationships.ListUsers(context.Background(), &ListUsersRequest{
 		Object:      FGAObjectRelation{Object: "doc:1"},
 		Relation:    "reader",
 		UserFilters: []UserTypeFilter{{Type: "user"}},

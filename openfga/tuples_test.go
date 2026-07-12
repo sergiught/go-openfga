@@ -32,7 +32,7 @@ func TestTuples_Write(t *testing.T) {
 	defer srv.Close()
 	c := testClient(t, srv.URL)
 	c.storeID = "s1"
-	_, err := c.Tuples.Write(context.Background(), &WriteRequest{
+	err := c.Tuples.Write(context.Background(), &WriteRequest{
 		Writes: &WriteRequestTuples{TupleKeys: []TupleKey{{User: "user:anne", Relation: "reader", Object: "doc:1"}}},
 	})
 	if err != nil {
@@ -55,7 +55,7 @@ func TestTuples_Write_FillsAuthorizationModelID(t *testing.T) {
 	c := testClient(t, srv.URL)
 	c.storeID = "s1"
 	c.authModelID = "model-1"
-	_, err := c.Tuples.Write(context.Background(), &WriteRequest{
+	err := c.Tuples.Write(context.Background(), &WriteRequest{
 		Writes: &WriteRequestTuples{TupleKeys: []TupleKey{{User: "user:anne", Relation: "reader", Object: "doc:1"}}},
 	})
 	if err != nil {
@@ -76,15 +76,15 @@ func TestTuples_ReadPaginates(t *testing.T) {
 	defer srv.Close()
 	c := testClient(t, srv.URL)
 	c.storeID = "s1"
-	page, resp, err := c.Tuples.Read(context.Background(), &ReadRequest{})
+	page, err := c.Tuples.Read(context.Background(), &ReadRequest{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(page.Tuples) != 1 {
 		t.Errorf("tuples = %d, want 1", len(page.Tuples))
 	}
-	if resp.ContinuationToken != "next" {
-		t.Errorf("token = %q, want next", resp.ContinuationToken)
+	if page.ContinuationToken != "next" {
+		t.Errorf("token = %q, want next", page.ContinuationToken)
 	}
 }
 
@@ -101,7 +101,7 @@ func TestTuples_Read_AppliesConsistency(t *testing.T) {
 	defer srv.Close()
 	c := testClient(t, srv.URL)
 	c.storeID = "s1"
-	_, _, err := c.Tuples.Read(context.Background(), &ReadRequest{}, WithConsistency(ConsistencyHigherConsistency))
+	_, err := c.Tuples.Read(context.Background(), &ReadRequest{}, WithConsistency(ConsistencyHigherConsistency))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func TestTuples_Read_AppliesDefaultConsistency(t *testing.T) {
 	c := testClient(t, srv.URL)
 	c.storeID = "s1"
 	c.consistency = ConsistencyHigherConsistency
-	_, _, err := c.Tuples.Read(context.Background(), &ReadRequest{})
+	_, err := c.Tuples.Read(context.Background(), &ReadRequest{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +147,7 @@ func TestTuples_Read_PerCallConsistencyOverridesDefault(t *testing.T) {
 	c := testClient(t, srv.URL)
 	c.storeID = "s1"
 	c.consistency = ConsistencyHigherConsistency
-	_, _, err := c.Tuples.Read(context.Background(), &ReadRequest{}, WithConsistency(ConsistencyMinimizeLatency))
+	_, err := c.Tuples.Read(context.Background(), &ReadRequest{}, WithConsistency(ConsistencyMinimizeLatency))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,7 +167,7 @@ func TestTuples_Write_DoesNotMutateRequest(t *testing.T) {
 	req := &WriteRequest{
 		Writes: &WriteRequestTuples{TupleKeys: []TupleKey{{User: "user:anne", Relation: "reader", Object: "doc:1"}}},
 	}
-	_, err := c.Tuples.Write(context.Background(), req)
+	err := c.Tuples.Write(context.Background(), req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +184,7 @@ func TestTuples_Read_DoesNotMutateRequest(t *testing.T) {
 	c := testClient(t, srv.URL)
 	c.storeID = "s1"
 	req := &ReadRequest{}
-	_, _, err := c.Tuples.Read(context.Background(), req, WithConsistency(ConsistencyHigherConsistency))
+	_, err := c.Tuples.Read(context.Background(), req, WithConsistency(ConsistencyHigherConsistency))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,7 +219,7 @@ func TestTuples_ReadChanges_QueryParams(t *testing.T) {
 	defer srv.Close()
 	c := testClient(t, srv.URL)
 	c.storeID = "s1"
-	out, resp, err := c.Tuples.ReadChanges(context.Background(), &ReadChangesOptions{
+	out, err := c.Tuples.ReadChanges(context.Background(), &ReadChangesOptions{
 		Type:              "document",
 		PageSize:          5,
 		ContinuationToken: "tok",
@@ -231,8 +231,8 @@ func TestTuples_ReadChanges_QueryParams(t *testing.T) {
 	if out == nil {
 		t.Fatal("out is nil")
 	}
-	if resp.ContinuationToken != "next" {
-		t.Errorf("token = %q, want next", resp.ContinuationToken)
+	if out.ContinuationToken != "next" {
+		t.Errorf("token = %q, want next", out.ContinuationToken)
 	}
 }
 
@@ -249,7 +249,7 @@ func TestWrite_ConflictOptionsSerialized(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = c.Tuples.Write(context.Background(), &WriteRequest{
+	err = c.Tuples.Write(context.Background(), &WriteRequest{
 		Writes: &WriteRequestTuples{
 			TupleKeys:   []TupleKey{{User: "user:anne", Relation: "reader", Object: "doc:1"}},
 			OnDuplicate: OnDuplicateIgnore,
@@ -282,7 +282,7 @@ func TestWrite_ConflictOptionsOmittedWhenUnset(t *testing.T) {
 	defer srv.Close()
 
 	c, _ := NewClient(srv.URL, WithStoreID(testStoreID))
-	_, err := c.Tuples.Write(context.Background(), &WriteRequest{
+	err := c.Tuples.Write(context.Background(), &WriteRequest{
 		Writes: &WriteRequestTuples{TupleKeys: []TupleKey{{User: "user:anne", Relation: "reader", Object: "doc:1"}}},
 	})
 	if err != nil {

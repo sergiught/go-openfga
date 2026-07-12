@@ -22,17 +22,19 @@ type RelationshipsService service
 // AssertionsService groups the assertion endpoints (write/read).
 type AssertionsService service
 
-// doStorePost is the common path for store-scoped POST query endpoints.
-func (c *Client) doStorePost(ctx context.Context, suffix string, body any, out any, opts []RequestOption) (*Response, error) {
+// doStorePost is the common path for store-scoped POST query endpoints. It
+// fires any OnResponse callback and returns only the error; the typed methods
+// expose the (result, error) surface.
+func (c *Client) doStorePost(ctx context.Context, suffix string, body any, out any, opts []RequestOption) error {
 	rc := newRequestConfig()
 	applyOptions(rc, opts)
 	store, err := c.storeFor(rc)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	req, err := c.newRequest(ctx, http.MethodPost, "/stores/"+store+suffix, body, rc.header)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return c.Do(req, out)
+	return c.do(req, out, rc)
 }

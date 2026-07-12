@@ -126,7 +126,7 @@ func (st *suiteState) hasTuple(user, relation, object string) bool {
 }
 
 func (st *suiteState) deleteTuple(ctx context.Context, user, relation, object string) error {
-	_, err := st.client.Tuples.Write(ctx, &openfga.WriteRequest{
+	err := st.client.Tuples.Write(ctx, &openfga.WriteRequest{
 		AuthorizationModelID: st.modelID,
 		Deletes: &openfga.WriteRequestTuples{TupleKeys: []openfga.TupleKey{
 			{User: user, Relation: relation, Object: object},

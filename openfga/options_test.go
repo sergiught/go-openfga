@@ -82,3 +82,27 @@ func TestWithRetry_And_WithoutRetry(t *testing.T) {
 		t.Errorf("WithoutRetry should clear retry config, got %+v", c2.retry)
 	}
 }
+
+func TestWithRetry_PartialConfigKeepsDefaults(t *testing.T) {
+	c, err := NewClient("https://api.fga.example", WithRetry(RetryConfig{MaxAttempts: 5}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.retry == nil {
+		t.Fatal("retry not set")
+	}
+	if c.retry.MaxAttempts != 5 {
+		t.Errorf("MaxAttempts = %d, want 5", c.retry.MaxAttempts)
+	}
+	// A partial config must not silently disable retries or the backoff ceiling.
+	def := defaultRetryConfig()
+	if len(c.retry.RetryableStatus) == 0 {
+		t.Error("RetryableStatus empty: partial config disabled all retries")
+	}
+	if c.retry.MaxWait != def.MaxWait {
+		t.Errorf("MaxWait = %v, want default %v", c.retry.MaxWait, def.MaxWait)
+	}
+	if c.retry.MinWait != def.MinWait {
+		t.Errorf("MinWait = %v, want default %v", c.retry.MinWait, def.MinWait)
+	}
+}
