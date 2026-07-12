@@ -17,6 +17,8 @@
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-fa6673.svg)](https://www.conventionalcommits.org)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
+[Quickstart](#-quickstart) · [Authentication](#-authentication) · [Configuration](#-configuration) · [Error handling](#-error-handling) · [API reference](https://pkg.go.dev/github.com/sergiught/go-openfga/openfga)
+
 </div>
 
 A hand-crafted, idiomatic Go client for the [OpenFGA](https://openfga.dev) HTTP API.
@@ -26,7 +28,34 @@ authentication, retries, and custom headers are layered as composable
 `http.RoundTripper` transports. Its consumer-facing dependency footprint is just
 `golang.org/x/oauth2` and `github.com/golang-jwt/jwt/v5`.
 
-## Features
+---
+
+## 📑 Table of contents
+
+- [✨ Features](#-features)
+- [📋 Requirements](#-requirements)
+- [📦 Installation](#-installation)
+- [🚀 Quickstart](#-quickstart)
+- [🔐 Authentication](#-authentication)
+- [🌱 Configuration from the environment](#-configuration-from-the-environment)
+- [📄 Pagination](#-pagination)
+- [📝 Writing tuples](#-writing-tuples)
+- [🔎 Batch checking](#-batch-checking)
+- [🧭 Listing objects and users](#-listing-objects-and-users)
+- [🧩 Contextual tuples and conditions](#-contextual-tuples-and-conditions)
+- [🧬 DSL models](#-dsl-models)
+- [🔧 Configuration](#-configuration)
+- [🚨 Error handling](#-error-handling)
+- [🔌 Extensibility and observability](#-extensibility-and-observability)
+- [🧪 Testing against a fake](#-testing-against-a-fake)
+- [📌 Stability](#-stability)
+- [📖 Documentation](#-documentation)
+- [🤝 Contributing](#-contributing)
+- [📜 License](#-license)
+
+---
+
+## ✨ Features
 
 - **Full v1 API coverage** — stores, authorization models, relationship tuples, all
   relationship queries (check, batch-check, expand, list-objects, list-users), and
@@ -53,18 +82,24 @@ authentication, retries, and custom headers are layered as composable
 - **Escape hatch** — `NewRequest`/`Do` let you call any endpoint while reusing the
   configured auth and transport stack.
 
-## Requirements
+<p align="right"><sub><a href="#-table-of-contents">↑ Back to table of contents</a></sub></p>
+
+## 📋 Requirements
 
 - Go 1.25 or newer.
 - An OpenFGA server to talk to — see the [OpenFGA docs](https://openfga.dev/docs) to run one.
 
-## Installation
+<p align="right"><sub><a href="#-table-of-contents">↑ Back to table of contents</a></sub></p>
+
+## 📦 Installation
 
 ```bash
 go get github.com/sergiught/go-openfga/openfga
 ```
 
-## Quickstart
+<p align="right"><sub><a href="#-table-of-contents">↑ Back to table of contents</a></sub></p>
+
+## 🚀 Quickstart
 
 ```go
 package main
@@ -123,7 +158,32 @@ manual control use `NewRequest` + `Do`. The fan-out helpers (`WriteTuples`,
 `DeleteTuples`, `BatchCheckAll`, `ListRelations`) issue several requests and do
 not invoke `OnResponse`.
 
-## Authentication
+### Bootstrapping a store and model
+
+Starting from nothing? Create a store, write a model, and point the client at
+both — after which every call uses them by default:
+
+```go
+client, _ := openfga.NewClient("https://api.fga.example", openfga.WithAPIToken("my-api-token"))
+
+store, err := client.Stores.Create(ctx, &openfga.CreateStoreRequest{Name: "acme"})
+if err != nil {
+	return err
+}
+client.SetStoreID(store.ID)
+
+// modelReq is a *WriteAuthorizationModelRequest — see "DSL models" below for
+// how to build one from DSL text or the typed schema.
+model, err := client.AuthorizationModels.Write(ctx, modelReq)
+if err != nil {
+	return err
+}
+client.SetAuthorizationModelID(model.AuthorizationModelID)
+```
+
+<p align="right"><sub><a href="#-table-of-contents">↑ Back to table of contents</a></sub></p>
+
+## 🔐 Authentication
 
 Pass exactly one authentication option to `NewClient`. Omit them all for an
 unauthenticated client.
@@ -156,10 +216,12 @@ openfga.WithTokenSource(mySource)
 ```
 
 Token fetches for the OAuth2 modes run through the configured base transport
-(see [Extensibility](#extensibility-and-observability)) with a bounded timeout,
+(see [Extensibility](#-extensibility-and-observability)) with a bounded timeout,
 so a slow issuer cannot wedge your requests indefinitely.
 
-## Configuration from the environment
+<p align="right"><sub><a href="#-table-of-contents">↑ Back to table of contents</a></sub></p>
+
+## 🌱 Configuration from the environment
 
 `NewClient` never reads the environment. Opt in with `NewClientFromEnv`, which
 resolves `FGA_*` variables; explicit options override them.
@@ -182,7 +244,9 @@ client, err := openfga.NewClientFromEnv(openfga.WithUserAgent("my-app/1.0"))
 Use `openfga.EnvOptions()` to merge env-derived options with your own in a
 custom order.
 
-## Pagination
+<p align="right"><sub><a href="#-table-of-contents">↑ Back to table of contents</a></sub></p>
+
+## 📄 Pagination
 
 Range-over-func iterators page transparently and lazily; the second loop value is an
 error you must check:
@@ -199,7 +263,9 @@ for store, err := range client.Stores.All(ctx, nil) {
 For manual control, call the `List`/`Read` methods and follow `ContinuationToken`
 yourself.
 
-## Writing tuples
+<p align="right"><sub><a href="#-table-of-contents">↑ Back to table of contents</a></sub></p>
+
+## 📝 Writing tuples
 
 A single transactional write (all-or-nothing, capped by the server at ~100 tuples):
 
@@ -218,10 +284,9 @@ _, err := client.Tuples.Write(ctx, &openfga.WriteRequest{
 `WriteTuples` and `DeleteTuples` accept arbitrarily large slices. By default they
 split the input into non-transactional chunks issued in parallel, so one chunk
 failing doesn't roll back the rest. The response reports a per-tuple outcome
-(order matches the input). Each chunk is one server-side atomic write, so a chunk
-that fails marks all of its tuples failed with the same error — larger chunks
-trade per-tuple attribution for fewer requests; use `WithMaxPerChunk(1)` for
-exact attribution:
+(order matches the input). Each chunk is one server-side atomic write, so a failed
+chunk marks all of its tuples failed with the same error — use `WithMaxPerChunk(1)`
+for exact per-tuple attribution:
 
 ```go
 resp, err := client.Tuples.WriteTuples(ctx, keys,
@@ -261,7 +326,9 @@ client.Tuples.WriteTuples(ctx, keys, openfga.WithOnDuplicate(openfga.OnDuplicate
 client.Tuples.DeleteTuples(ctx, keys, openfga.WithOnMissing(openfga.OnMissingIgnore))
 ```
 
-## Batch checking
+<p align="right"><sub><a href="#-table-of-contents">↑ Back to table of contents</a></sub></p>
+
+## 🔎 Batch checking
 
 The native `Relationships.BatchCheck` sends up to the server's per-request limit in
 one call. `BatchCheckAll` accepts any number of checks, splits them across parallel
@@ -294,7 +361,63 @@ allowed, err := client.Relationships.ListRelations(ctx, &openfga.ListRelationsRe
 // allowed == []string{"can_view", "can_edit"}
 ```
 
-## DSL models
+<p align="right"><sub><a href="#-table-of-contents">↑ Back to table of contents</a></sub></p>
+
+## 🧭 Listing objects and users
+
+`ListObjects` answers the inverse of a check — "which objects of a type can this
+user access?" — and is the query behind most "list the things I can see" views:
+
+```go
+resp, err := client.Relationships.ListObjects(ctx, &openfga.ListObjectsRequest{
+	Type:     "document",
+	Relation: "reader",
+	User:     "user:anne",
+})
+// resp.Objects == []string{"document:budget", "document:roadmap"}
+```
+
+`ListUsers` is the mirror image (which users have a relation on an object) and
+`Expand` returns the full userset tree for a single relation. When the result set
+is large, `StreamedListObjects` yields objects from the NDJSON endpoint as they
+arrive instead of buffering the whole page:
+
+```go
+for obj, err := range client.Relationships.StreamedListObjects(ctx, req) {
+	if err != nil {
+		return err
+	}
+	fmt.Println(obj.Object)
+}
+```
+
+<p align="right"><sub><a href="#-table-of-contents">↑ Back to table of contents</a></sub></p>
+
+## 🧩 Contextual tuples and conditions
+
+Pass tuples that exist only for the duration of one query via `ContextualTuples`,
+and supply the `Context` that OpenFGA's conditioned (ABAC) relations evaluate
+against. Both hang off a `CheckRequest` — `NewCheckRequest` fills in the common
+fields so you only set what you need:
+
+```go
+req := openfga.NewCheckRequest("user:anne", "reader", "document:budget")
+req.ContextualTuples = &openfga.ContextualTupleKeys{
+	TupleKeys: []openfga.TupleKey{
+		{User: "user:anne", Relation: "member", Object: "team:finance"},
+	},
+}
+req.Context = map[string]any{"current_time": "2026-01-01T09:00:00Z"}
+
+resp, err := client.Relationships.Check(ctx, req)
+```
+
+Contextual tuples and `Context` are accepted by the query methods
+(`Check`, `BatchCheck`, `ListObjects`, `ListUsers`) the same way.
+
+<p align="right"><sub><a href="#-table-of-contents">↑ Back to table of contents</a></sub></p>
+
+## 🧬 DSL models
 
 The `dsl` module converts between OpenFGA's DSL syntax and the JSON model types. It
 lives in a separate module so its transformer dependency stays out of the core SDK's
@@ -348,7 +471,9 @@ relation), `TupleTo` (`X from Y`), `Union` (`or`), `Intersection` (`and`), and
 `Exclusion` (`but not`). The typed schema round-trips losslessly with the `dsl`
 module, so you can mix the two.
 
-## Configuration
+<p align="right"><sub><a href="#-table-of-contents">↑ Back to table of contents</a></sub></p>
+
+## 🔧 Configuration
 
 Client-wide options are passed to `NewClient`:
 
@@ -369,7 +494,9 @@ Per-call options override client defaults for a single request:
 `WithAuthorizationModelID`/`WithAuthorizationModel`,
 `WithDefaultConsistency`/`WithConsistency`.)
 
-## Error handling
+<p align="right"><sub><a href="#-table-of-contents">↑ Back to table of contents</a></sub></p>
+
+## 🚨 Error handling
 
 Non-2xx responses become typed errors, all embedding `*ErrorResponse` and
 reachable with `errors.As`:
@@ -398,7 +525,9 @@ case err != nil:
 `openfga.Code*` constants), and `ErrorResponse.RequestID()` returns the server
 correlation ID for support tickets.
 
-## Extensibility and observability
+<p align="right"><sub><a href="#-table-of-contents">↑ Back to table of contents</a></sub></p>
+
+## 🔌 Extensibility and observability
 
 The client owns only an `*http.Client`; auth, retries, and headers are layered
 as `http.RoundTripper` transports. To add tracing, metrics, or a custom dialer
@@ -421,7 +550,9 @@ openfga.WithRequestObserver(func(req *http.Request, resp *http.Response, err err
 elsewhere. `WithHTTPClient` remains the full escape hatch, but it replaces the
 entire chain (auth, retries, and headers included).
 
-## Testing against a fake
+<p align="right"><sub><a href="#-table-of-contents">↑ Back to table of contents</a></sub></p>
+
+## 🧪 Testing against a fake
 
 The client talks to any base URL, so point it at an `httptest.Server` in unit
 tests — no live OpenFGA required:
@@ -439,26 +570,36 @@ client, _ := openfga.NewClient(srv.URL, openfga.WithStoreID("01ARZ3NDEKTSV4RRFFQ
 Give each request a deadline with `context.WithTimeout`; the deadline bounds the
 whole call including retries.
 
-## Stability
+<p align="right"><sub><a href="#-table-of-contents">↑ Back to table of contents</a></sub></p>
+
+## 📌 Stability
 
 Pre-1.0: the public API may change between minor versions. Pin a version and
 review the [changelog](CHANGELOG.md) before upgrading. Once tagged `v1.0.0`, the
 package follows semantic versioning.
 
-## Documentation
+<p align="right"><sub><a href="#-table-of-contents">↑ Back to table of contents</a></sub></p>
+
+## 📖 Documentation
 
 Full API documentation, with runnable examples for the major entry points, lives on
 [pkg.go.dev](https://pkg.go.dev/github.com/sergiught/go-openfga/openfga).
 
-## Contributing
+<p align="right"><sub><a href="#-table-of-contents">↑ Back to table of contents</a></sub></p>
+
+## 🤝 Contributing
 
 Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the development
 workflow, and the [Code of Conduct](CODE_OF_CONDUCT.md). To report a security issue,
 follow the [security policy](SECURITY.md).
 
-## License
+<p align="right"><sub><a href="#-table-of-contents">↑ Back to table of contents</a></sub></p>
+
+## 📜 License
 
 [MIT](LICENSE) © 2024-2026 Sergiu Ghitea.
 
 This project is an independent client and is not affiliated with or endorsed by the
 OpenFGA project or the CNCF.
+
+<p align="right"><sub><a href="#-table-of-contents">↑ Back to table of contents</a></sub></p>
