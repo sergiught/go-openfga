@@ -10,7 +10,7 @@ import (
 
 func TestAPIToken_SetsBearer(t *testing.T) {
 	crt := &captureRT{}
-	rt := wrapAuth((&apiTokenSource{token: "sekret"}).transport(), crt)
+	rt := (&apiTokenSource{token: "sekret"}).transport(crt, nil)
 	req, _ := http.NewRequest(http.MethodGet, "https://x/", nil)
 	if _, err := rt.RoundTrip(req); err != nil {
 		t.Fatal(err)
@@ -22,8 +22,8 @@ func TestAPIToken_SetsBearer(t *testing.T) {
 
 func TestWithAPIToken_WiresAuthTransport(t *testing.T) {
 	c, _ := NewClient("https://api.fga.example", WithAPIToken("tok"))
-	if c.authTransport == nil {
-		t.Fatal("auth transport not set")
+	if c.auth == nil {
+		t.Fatal("auth spec not set")
 	}
 }
 
@@ -48,19 +48,16 @@ func TestWithClientCredentials_SendsBearerToken(t *testing.T) {
 	defer apiSrv.Close()
 
 	crt := &captureRT{}
-	rt := wrapAuth(
-		func() http.RoundTripper {
-			cfg := ClientCredentialsConfig{
-				TokenURL:     tokenSrv.URL,
-				ClientID:     "client-id",
-				ClientSecret: "client-secret",
-			}
-			c := &Client{}
-			WithClientCredentials(cfg)(c)
-			return c.auth.transport()
-		}(),
-		crt,
-	)
+	rt := func() http.RoundTripper {
+		cfg := ClientCredentialsConfig{
+			TokenURL:     tokenSrv.URL,
+			ClientID:     "client-id",
+			ClientSecret: "client-secret",
+		}
+		c := &Client{}
+		WithClientCredentials(cfg)(c)
+		return c.auth.transport(crt, &http.Client{})
+	}()
 
 	req, _ := http.NewRequest(http.MethodGet, apiSrv.URL+"/", nil)
 	if _, err := rt.RoundTrip(req); err != nil {

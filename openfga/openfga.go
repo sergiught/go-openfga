@@ -24,7 +24,8 @@ type Client struct {
 	// Transport-layer config assembled in NewClient.
 	staticHeaders http.Header
 	auth          authSpec
-	authTransport http.RoundTripper
+	baseTransport http.RoundTripper
+	observer      RequestObserver
 	retry         *RetryConfig
 
 	common service
@@ -130,11 +131,12 @@ func (c *Client) finish() *Client {
 // buildHTTPClient assembles the auth + transport chain, unless the caller
 // supplied a full *http.Client via WithHTTPClient.
 func (c *Client) buildHTTPClient() {
-	if c.auth != nil {
-		c.authTransport = c.auth.transport()
-	}
 	if c.client == nil {
-		c.client = &http.Client{Transport: c.buildTransport(http.DefaultTransport)}
+		base := c.baseTransport
+		if base == nil {
+			base = http.DefaultTransport
+		}
+		c.client = &http.Client{Transport: c.buildTransport(base)}
 	}
 }
 
@@ -148,14 +150,21 @@ func (c *Client) wireServices() {
 	c.Assertions = (*AssertionsService)(&c.common)
 }
 
-// buildTransport composes: retry -> auth -> static-headers -> base.
+// buildTransport composes: retry -> auth -> static-headers -> observer -> base.
+// The observer sits innermost so it sees each attempt's fully-decorated request.
 func (c *Client) buildTransport(base http.RoundTripper) http.RoundTripper {
 	rt := base
+	if c.observer != nil {
+		rt = &observerTransport{base: rt, obs: c.observer}
+	}
 	if len(c.staticHeaders) > 0 {
 		rt = &headerTransport{base: rt, header: c.staticHeaders}
 	}
-	if c.authTransport != nil {
-		rt = wrapAuth(c.authTransport, rt)
+	if c.auth != nil {
+		// Token fetches go through base (configured transport) with a bounded
+		// timeout, but bypass the retry/header layers above.
+		tokenClient := &http.Client{Transport: base, Timeout: tokenFetchTimeout}
+		rt = c.auth.transport(rt, tokenClient)
 	}
 	if c.retry != nil {
 		rt = &retryTransport{base: rt, cfg: *c.retry}
@@ -180,9 +189,19 @@ func WithUserAgent(ua string) Option { return func(c *Client) { c.userAgent = ua
 
 // WithHTTPClient supplies a fully-configured *http.Client (escape hatch). When set, the SDK does NOT
 // assemble its own transport chain, so WithAPIToken, WithClientCredentials, WithPrivateKeyJWT,
-// WithHeaders, and WithRetry have no effect — configure auth, headers, and retries on the supplied
-// client's Transport yourself.
+// WithHeaders, WithRetry, and WithBaseTransport have no effect — configure auth, headers, and
+// retries on the supplied client's Transport yourself.
 func WithHTTPClient(hc *http.Client) Option { return func(c *Client) { c.client = hc } }
+
+// WithBaseTransport sets the innermost http.RoundTripper beneath the SDK's
+// retry, auth, and header layers. Use it to add tracing, metrics, logging, or a
+// custom dialer while keeping the SDK's auth and retries — for example
+// otelhttp.NewTransport(nil) for per-attempt spans. It also becomes the base
+// for out-of-band OAuth2 token fetches. Defaults to http.DefaultTransport.
+// Ignored when WithHTTPClient supplies a full client.
+func WithBaseTransport(rt http.RoundTripper) Option {
+	return func(c *Client) { c.baseTransport = rt }
+}
 
 // WithBaseURL overrides the API base URL (highest precedence).
 func WithBaseURL(raw string) Option {
@@ -230,3 +249,9 @@ func (c *Client) consistencyFor(rc *requestConfig) ConsistencyPreference {
 
 // BaseURL returns the API base URL the client targets.
 func (c *Client) BaseURL() string { return c.baseURL.String() }
+
+// Transport returns the http.RoundTripper the client uses: the assembled
+// retry/auth/header chain, or the transport of a client supplied via
+// WithHTTPClient. It lets callers reuse the SDK's configured transport, for
+// example to wrap the whole logical request (across retries) in a span.
+func (c *Client) Transport() http.RoundTripper { return c.client.Transport }

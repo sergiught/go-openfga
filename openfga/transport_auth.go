@@ -19,33 +19,28 @@ import (
 	"golang.org/x/oauth2/clientcredentials"
 )
 
+// tokenFetchTimeout bounds each out-of-band OAuth2 token request so a slow or
+// hostile token endpoint cannot wedge every API call behind an unbounded fetch.
+const tokenFetchTimeout = 30 * time.Second
+
 // authSpec is a credential configuration that can be validated and turned into
 // an auth RoundTripper. Options store a spec; NewClient validates and builds it.
+//
+// The transport method wraps base with credential handling and returns the
+// result. Specs performing out-of-band token fetches use tokenClient for those
+// requests, so token traffic honors the configured base transport and a bounded
+// timeout.
 type authSpec interface {
 	validate() error
-	transport() http.RoundTripper
-}
-
-// wrapAuth places an auth transport in front of base. The auth transport is
-// expected to be an *oauth2.Transport whose Base we set to base.
-func wrapAuth(auth http.RoundTripper, base http.RoundTripper) http.RoundTripper {
-	if ot, ok := auth.(*oauth2.Transport); ok {
-		ot.Base = base
-		return ot
-	}
-	if bt, ok := auth.(*bearerTransport); ok {
-		bt.base = base
-		return bt
-	}
-	return auth
+	transport(base http.RoundTripper, tokenClient *http.Client) http.RoundTripper
 }
 
 // Pre-shared API token.
 
 type apiTokenSource struct{ token string }
 
-func (s *apiTokenSource) transport() http.RoundTripper {
-	return &bearerTransport{token: s.token}
+func (s *apiTokenSource) transport(base http.RoundTripper, _ *http.Client) http.RoundTripper {
+	return &bearerTransport{token: s.token, base: base}
 }
 
 func (s *apiTokenSource) validate() error {
@@ -106,7 +101,7 @@ func (s *clientCredentialsSpec) validate() error {
 	return nil
 }
 
-func (s *clientCredentialsSpec) transport() http.RoundTripper {
+func (s *clientCredentialsSpec) transport(base http.RoundTripper, tokenClient *http.Client) http.RoundTripper {
 	params := map[string][]string{}
 	if s.audience != "" {
 		params["audience"] = []string{s.audience}
@@ -118,8 +113,11 @@ func (s *clientCredentialsSpec) transport() http.RoundTripper {
 		Scopes:         s.scopes,
 		EndpointParams: params,
 	}
-	ts := oc.TokenSource(context.Background())
-	return &oauth2.Transport{Source: oauth2.ReuseTokenSource(nil, ts)}
+	// Route token fetches through tokenClient (bounded timeout, configured base
+	// transport) rather than oauth2's default http.DefaultClient.
+	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, tokenClient)
+	ts := oc.TokenSource(ctx)
+	return &oauth2.Transport{Source: oauth2.ReuseTokenSource(nil, ts), Base: base}
 }
 
 // WithClientCredentials authenticates via the OAuth2 client-credentials grant.
@@ -149,7 +147,10 @@ type PrivateKeyJWTConfig struct {
 	KeyID         string
 }
 
-type privateKeyJWTSource struct{ cfg PrivateKeyJWTConfig }
+type privateKeyJWTSource struct {
+	cfg        PrivateKeyJWTConfig
+	httpClient *http.Client // token-fetch client; set when built into a transport.
+}
 
 // jwtBearerAssertionType is the RFC 7523 client-assertion type URN, not a
 // credential.
@@ -207,7 +208,13 @@ func (s *privateKeyJWTSource) Token() (*oauth2.Token, error) {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := http.DefaultClient.Do(req)
+	hc := s.httpClient
+	if hc == nil {
+		// No transport-supplied client (e.g. Token called directly): still bound
+		// the fetch with a timeout rather than falling back to no deadline.
+		hc = &http.Client{Timeout: tokenFetchTimeout}
+	}
+	resp, err := hc.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -245,11 +252,35 @@ func (s *privateKeyJWTSource) validate() error {
 	return nil
 }
 
-func (s *privateKeyJWTSource) transport() http.RoundTripper {
-	return &oauth2.Transport{Source: oauth2.ReuseTokenSource(nil, s)}
+func (s *privateKeyJWTSource) transport(base http.RoundTripper, tokenClient *http.Client) http.RoundTripper {
+	s.httpClient = tokenClient
+	return &oauth2.Transport{Source: oauth2.ReuseTokenSource(nil, s), Base: base}
 }
 
 // WithPrivateKeyJWT authenticates using a signed JWT client assertion.
 func WithPrivateKeyJWT(cfg PrivateKeyJWTConfig) Option {
 	return func(c *Client) { c.auth = &privateKeyJWTSource{cfg: cfg} }
+}
+
+// tokenSourceSpec authenticates with a caller-supplied oauth2.TokenSource.
+type tokenSourceSpec struct{ src oauth2.TokenSource }
+
+func (s *tokenSourceSpec) validate() error {
+	if s.src == nil {
+		return errors.New("openfga: WithTokenSource requires a non-nil oauth2.TokenSource")
+	}
+	return nil
+}
+
+func (s *tokenSourceSpec) transport(base http.RoundTripper, _ *http.Client) http.RoundTripper {
+	return &oauth2.Transport{Source: oauth2.ReuseTokenSource(nil, s.src), Base: base}
+}
+
+// WithTokenSource authenticates every request with a bearer token obtained from
+// any oauth2.TokenSource, for credential sources beyond the built-in modes
+// (e.g. Vault, workload identity, a pre-existing token source). The SDK caches
+// tokens via oauth2.ReuseTokenSource and keeps its retry and header chain
+// beneath the auth layer. Pass exactly one authentication option to NewClient.
+func WithTokenSource(src oauth2.TokenSource) Option {
+	return func(c *Client) { c.auth = &tokenSourceSpec{src: src} }
 }

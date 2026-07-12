@@ -55,8 +55,8 @@ func TestWithPrivateKeyJWT_WiresAuthTransport(t *testing.T) {
 		TokenURL: "https://issuer.example/oauth/token", ClientID: "x",
 		SigningKey: key, SigningMethod: jwt.SigningMethodRS256,
 	}))
-	if c.authTransport == nil {
-		t.Fatal("auth transport not set")
+	if c.auth == nil {
+		t.Fatal("auth spec not set")
 	}
 	_ = context.Background
 	_ = url.Values{}
