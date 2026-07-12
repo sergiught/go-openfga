@@ -19,8 +19,7 @@
 
 </div>
 
-A hand-crafted, idiomatic Go client for the [OpenFGA](https://openfga.dev) HTTP API,
-modeled on the design quality of [`google/go-github`](https://github.com/google/go-github).
+A hand-crafted, idiomatic Go client for the [OpenFGA](https://openfga.dev) HTTP API.
 
 The client is auth-agnostic at its core: it owns only an `*http.Client`, and
 authentication, retries, and custom headers are layered as composable
