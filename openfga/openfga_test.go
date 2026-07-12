@@ -7,13 +7,13 @@ import (
 
 func TestNewClient_DefaultsAndOptions(t *testing.T) {
 	c, err := NewClient("https://api.fga.example",
-		WithStoreID("store1"),
-		WithAuthorizationModelID("model1"),
+		WithStoreID(testStoreID),
+		WithAuthorizationModelID(testModelID),
 		WithUserAgent("test-agent"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.storeID != "store1" || c.authModelID != "model1" {
+	if c.storeID != testStoreID || c.authModelID != testModelID {
 		t.Errorf("ids = %q %q", c.storeID, c.authModelID)
 	}
 	if c.userAgent != "test-agent" {

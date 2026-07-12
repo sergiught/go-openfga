@@ -13,7 +13,7 @@ import (
 func ExampleNewClient() {
 	client, err := openfga.NewClient(
 		"https://api.fga.example",
-		openfga.WithStoreID("01H5XGPQ5J6YBWBG4Z4BKRE7P"),
+		openfga.WithStoreID("01ARZ3NDEKTSV4RRFFQ69G5FAV"),
 		openfga.WithAPIToken("my-api-token"),
 	)
 	if err != nil {
@@ -28,7 +28,7 @@ func ExampleNewClient() {
 func ExampleRelationshipsService_Check() {
 	client, err := openfga.NewClient(
 		"https://api.fga.example",
-		openfga.WithStoreID("01H5XGPQ5J6YBWBG4Z4BKRE7P"),
+		openfga.WithStoreID("01ARZ3NDEKTSV4RRFFQ69G5FAV"),
 		openfga.WithAPIToken("my-api-token"),
 	)
 	if err != nil {
@@ -55,7 +55,7 @@ func ExampleRelationshipsService_Check() {
 func ExampleClient_NewRequest() {
 	client, err := openfga.NewClient(
 		"https://api.fga.example",
-		openfga.WithStoreID("01H5XGPQ5J6YBWBG4Z4BKRE7P"),
+		openfga.WithStoreID("01ARZ3NDEKTSV4RRFFQ69G5FAV"),
 		openfga.WithAPIToken("my-api-token"),
 	)
 	if err != nil {

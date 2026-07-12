@@ -245,7 +245,7 @@ func TestWrite_ConflictOptionsSerialized(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(srv.URL, WithStoreID("store1"))
+	c, err := NewClient(srv.URL, WithStoreID(testStoreID))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +281,7 @@ func TestWrite_ConflictOptionsOmittedWhenUnset(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, _ := NewClient(srv.URL, WithStoreID("store1"))
+	c, _ := NewClient(srv.URL, WithStoreID(testStoreID))
 	_, err := c.Tuples.Write(context.Background(), &WriteRequest{
 		Writes: &WriteRequestTuples{TupleKeys: []TupleKey{{User: "user:anne", Relation: "reader", Object: "doc:1"}}},
 	})
@@ -316,7 +316,7 @@ func TestWriteTuples_ChunksAndReportsPerTuple(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, _ := NewClient(srv.URL, WithStoreID("store1"))
+	c, _ := NewClient(srv.URL, WithStoreID(testStoreID))
 	keys := []TupleKey{
 		{User: "user:a", Relation: "reader", Object: "doc:1"},
 		{User: "user:b", Relation: "reader", Object: "doc:bad"},
@@ -354,7 +354,7 @@ func TestWriteTuples_TransactionSendsSingleRequest(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, _ := NewClient(srv.URL, WithStoreID("store1"))
+	c, _ := NewClient(srv.URL, WithStoreID(testStoreID))
 	keys := []TupleKey{
 		{User: "user:a", Relation: "reader", Object: "doc:1"},
 		{User: "user:b", Relation: "reader", Object: "doc:2"},
@@ -380,7 +380,7 @@ func TestDeleteTuples_SendsDeletesWithOnMissing(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, _ := NewClient(srv.URL, WithStoreID("store1"))
+	c, _ := NewClient(srv.URL, WithStoreID(testStoreID))
 	keys := []TupleKey{{User: "user:a", Relation: "reader", Object: "doc:1"}}
 	resp, err := c.Tuples.DeleteTuples(context.Background(), keys, WithTransaction(), WithOnMissing(OnMissingIgnore))
 	if err != nil {
@@ -405,7 +405,7 @@ func TestWriteTuples_EmptyKeysNoRequest(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
-	c, _ := NewClient(srv.URL, WithStoreID("store1"))
+	c, _ := NewClient(srv.URL, WithStoreID(testStoreID))
 	resp, err := c.Tuples.WriteTuples(context.Background(), nil)
 	if err != nil || len(resp.Writes) != 0 || atomic.LoadInt32(&reqCount) != 0 {
 		t.Fatal("empty keys should issue no request and return empty response")

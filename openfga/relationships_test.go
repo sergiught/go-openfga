@@ -230,7 +230,7 @@ func TestBatchCheckAll_ChunksAndMerges(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, _ := NewClient(srv.URL, WithStoreID("store1"))
+	c, _ := NewClient(srv.URL, WithStoreID(testStoreID))
 	var checks []BatchCheckItem
 	for i := 0; i < 5; i++ {
 		obj := "doc:no"
@@ -273,7 +273,7 @@ func TestBatchCheckAll_GeneratesMissingCorrelationIDs(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, _ := NewClient(srv.URL, WithStoreID("store1"))
+	c, _ := NewClient(srv.URL, WithStoreID(testStoreID))
 	resp, err := c.Relationships.BatchCheckAll(context.Background(), &BatchCheckRequest{Checks: []BatchCheckItem{
 		{TupleKey: CheckRequestTupleKey{User: "user:a", Relation: "reader", Object: "doc:1"}},
 	}})
@@ -286,7 +286,7 @@ func TestBatchCheckAll_GeneratesMissingCorrelationIDs(t *testing.T) {
 }
 
 func TestBatchCheckAll_DuplicateCorrelationIDsError(t *testing.T) {
-	c, _ := NewClient("http://example.invalid", WithStoreID("store1"))
+	c, _ := NewClient("http://example.invalid", WithStoreID(testStoreID))
 	_, err := c.Relationships.BatchCheckAll(context.Background(), &BatchCheckRequest{Checks: []BatchCheckItem{
 		{TupleKey: CheckRequestTupleKey{User: "user:a", Relation: "reader", Object: "doc:1"}, CorrelationID: "dup"},
 		{TupleKey: CheckRequestTupleKey{User: "user:b", Relation: "reader", Object: "doc:2"}, CorrelationID: "dup"},
@@ -297,7 +297,7 @@ func TestBatchCheckAll_DuplicateCorrelationIDsError(t *testing.T) {
 }
 
 func TestBatchCheckAll_EmptyChecks(t *testing.T) {
-	c, _ := NewClient("http://example.invalid", WithStoreID("store1"))
+	c, _ := NewClient("http://example.invalid", WithStoreID(testStoreID))
 	resp, err := c.Relationships.BatchCheckAll(context.Background(), &BatchCheckRequest{})
 	if err != nil || len(resp.Result) != 0 {
 		t.Fatal("empty checks should return empty result and nil error")
@@ -308,8 +308,8 @@ func TestListRelations_ReturnsAllowedInInputOrder(t *testing.T) {
 	var reqCount int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&reqCount, 1)
-		if r.URL.Path != "/stores/s1/batch-check" {
-			t.Fatalf("want /stores/s1/batch-check, got %s", r.URL.Path)
+		if r.URL.Path != "/stores/"+testStoreID+"/batch-check" {
+			t.Fatalf("want /stores/%s/batch-check, got %s", testStoreID, r.URL.Path)
 		}
 		var body BatchCheckRequest
 		_ = json.NewDecoder(r.Body).Decode(&body)
@@ -324,7 +324,7 @@ func TestListRelations_ReturnsAllowedInInputOrder(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, _ := NewClient(srv.URL, WithStoreID("s1"))
+	c, _ := NewClient(srv.URL, WithStoreID(testStoreID))
 	got, err := c.Relationships.ListRelations(context.Background(), &ListRelationsRequest{
 		User:      "user:anne",
 		Object:    "document:budget",
@@ -348,7 +348,7 @@ func TestListRelations_EmptyRelationsNoRequest(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
-	c, _ := NewClient(srv.URL, WithStoreID("s1"))
+	c, _ := NewClient(srv.URL, WithStoreID(testStoreID))
 	got, err := c.Relationships.ListRelations(context.Background(), &ListRelationsRequest{
 		User: "user:anne", Object: "document:budget",
 	})
@@ -358,7 +358,7 @@ func TestListRelations_EmptyRelationsNoRequest(t *testing.T) {
 }
 
 func TestListRelations_DuplicateRelationsError(t *testing.T) {
-	c, _ := NewClient("http://example.invalid", WithStoreID("s1"))
+	c, _ := NewClient("http://example.invalid", WithStoreID(testStoreID))
 	_, err := c.Relationships.ListRelations(context.Background(), &ListRelationsRequest{
 		User: "user:anne", Object: "document:budget",
 		Relations: []string{"can_view", "can_view"},
