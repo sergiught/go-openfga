@@ -33,6 +33,9 @@ func (s *StoresService) List(ctx context.Context, opts *ListStoresOptions, ropts
 		if opts.ContinuationToken != "" {
 			q.Set("continuation_token", opts.ContinuationToken)
 		}
+		if opts.Name != "" {
+			q.Set("name", opts.Name)
+		}
 		if len(q) > 0 {
 			path += "?" + q.Encode()
 		}

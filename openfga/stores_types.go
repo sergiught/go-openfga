@@ -16,10 +16,11 @@ type CreateStoreRequest struct {
 	Name string `json:"name"`
 }
 
-// ListStoresOptions controls List pagination.
+// ListStoresOptions controls List pagination and filtering.
 type ListStoresOptions struct {
 	PageSize          int
 	ContinuationToken string
+	Name              string // filter to stores with this exact name; optional
 }
 
 // ListStoresResponse is the List result page.
