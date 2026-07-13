@@ -13,7 +13,7 @@ env:
   # Floor patch: the minimum Go the module supports (go.mod `go` directive is
   # 1.25.0), pinned to a patch release free of known stdlib vulnerabilities so
   # govulncheck stays green. Bump when a newer patch fixes a reported vuln.
-  GO_VERSION: '1.25.12'
+  GO_VERSION: '1.26.5'
   GOLANGCI_LINT_VERSION: 'v2.12.2'
 
 concurrency:
