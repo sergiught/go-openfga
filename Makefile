@@ -26,7 +26,7 @@ $(BINARIES_DIR)/commitlint:
 
 $(BINARIES_DIR)/govulncheck:
 	@echo "==> Installing govulncheck within ${BINARIES_DIR}"
-	@GOBIN=$(BINARIES_DIR) go install golang.org/x/vuln/cmd/govulncheck@0782b76014f15f24e22a438f30f308df42899ba1 # v1.3.0
+	@GOBIN=$(BINARIES_DIR) go install golang.org/x/vuln/cmd/govulncheck@19b0bb6a272792b9afa8a6983c3e9b9a1816947f # v1.6.0
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Test (https://pkg.go.dev/testing — unit + coverage + testcontainers integration)
