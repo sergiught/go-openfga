@@ -24,9 +24,6 @@ concurrency:
   group: pr-title-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
-env:
-  GO_VERSION: '1.25.12'
-
 jobs:
   lint-title:
     name: commitlint (PR title)
@@ -35,9 +32,20 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # go.mod's `go` directive is a support floor; take its minor at the latest
+      # patch so this job tracks the toolchain CI uses without a second pin.
+      - id: resolve
+        run: |
+          set -euo pipefail
+          minor="$(sed -n 's/^go \([0-9]\{1,\}\.[0-9]\{1,\}\).*/\1/p' go.mod | head -1)"
+          if [ -z "$minor" ]; then
+            echo "::error file=go.mod::could not parse the go directive"
+            exit 1
+          fi
+          echo "floor=${minor}.x" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version: ${{ steps.resolve.outputs.floor }}
           cache: true
       - name: lint PR title
         env:
