@@ -9,11 +9,6 @@ permissions:
   contents: read
 
 env:
-  # Floor: the minimum Go the module supports (go.mod `go` directive).
-  # Floor patch: the minimum Go the module supports (go.mod `go` directive is
-  # 1.25.0), pinned to a patch release free of known stdlib vulnerabilities so
-  # govulncheck stays green. Bump when a newer patch fixes a reported vuln.
-  GO_VERSION: '1.25.12'
   GOLANGCI_LINT_VERSION: 'v2.12.2'
 
 concurrency:
@@ -21,14 +16,39 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # go.mod's `go` directive is a support floor (1.25.0), not the toolchain we
+  # want CI to run. Derive `<major>.<minor>.x` from it so setup-go resolves the
+  # newest patch in that line: the floor minor still gets exercised, but with
+  # current stdlib fixes so govulncheck stays green without a hand-managed pin.
+  go-version:
+    name: resolve Go version
+    runs-on: ubuntu-latest
+    outputs:
+      floor: ${{ steps.resolve.outputs.floor }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - id: resolve
+        run: |
+          set -euo pipefail
+          minor="$(sed -n 's/^go \([0-9]\{1,\}\.[0-9]\{1,\}\).*/\1/p' go.mod | head -1)"
+          if [ -z "$minor" ]; then
+            echo "::error file=go.mod::could not parse the go directive"
+            exit 1
+          fi
+          echo "floor=${minor}.x" >> "$GITHUB_OUTPUT"
+          echo "Resolved Go floor from go.mod: ${minor}.x"
+
   lint:
     name: lint (golangci-lint + module drift)
     runs-on: ubuntu-latest
+    needs: go-version
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version: ${{ needs.go-version.outputs.floor }}
           cache: true
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
@@ -83,6 +103,7 @@ jobs:
   test:
     name: test (-race, coverage)
     runs-on: ${{ matrix.os }}
+    needs: go-version
     strategy:
       fail-fast: false
       matrix:
@@ -91,10 +112,10 @@ jobs:
         # catch platform-specific regressions in a library consumers embed
         # anywhere.
         os: [ubuntu-latest, macos-latest, windows-latest]
-        # The first entry (env.GO_VERSION) is the supported floor; the second
-        # tracks whatever Go upstream currently calls "stable". Catches
+        # The first entry is the go.mod floor minor at its latest patch; the
+        # second tracks whatever Go upstream currently calls "stable". Catches
         # toolchain drift in both directions — cheap insurance for a library.
-        go-version: ['1.25.12', 'stable']
+        go-version: ['${{ needs.go-version.outputs.floor }}', 'stable']
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
@@ -115,7 +136,7 @@ jobs:
         run: go test -race -count=1 -coverprofile=coverage.out -covermode=atomic ./...
       - name: upload coverage to Codecov
         # Only the floor run on Linux uploads; otherwise the matrix double-counts.
-        if: matrix.go-version == '1.25.12' && matrix.os == 'ubuntu-latest'
+        if: matrix.go-version == needs.go-version.outputs.floor && matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -124,7 +145,7 @@ jobs:
           fail_ci_if_error: false
       - name: upload dsl coverage to Codecov
         # Only the floor run on Linux uploads; otherwise the matrix double-counts.
-        if: matrix.go-version == '1.25.12' && matrix.os == 'ubuntu-latest'
+        if: matrix.go-version == needs.go-version.outputs.floor && matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -150,11 +171,12 @@ jobs:
   vuln:
     name: govulncheck
     runs-on: ubuntu-latest
+    needs: go-version
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version: ${{ needs.go-version.outputs.floor }}
           cache: true
       - name: make vuln
         run: make vuln
