@@ -9,6 +9,9 @@
   "schedule": ["before 6am on monday"],
   "timezone": "Europe/Madrid",
   "rangeStrategy": "bump",
+  "constraints": {
+    "go": "1.25"
+  },
   "labels": ["dependencies"],
   "prConcurrentLimit": 5,
   "prHourlyLimit": 0,
@@ -18,7 +21,7 @@
   },
   "packageRules": [
     {
-      "description": "Never auto-bump the go directive in go.mod; the support floor is a deliberate, manually-managed compatibility decision. Scoped to gomod so the CI toolchain pin (GO_VERSION, tracked via customManagers) can still update",
+      "description": "Never auto-bump the go directive in go.mod; the support floor is a deliberate, manually-managed compatibility decision. CI no longer pins a toolchain version — it derives <major>.<minor>.x from this directive and lets setup-go resolve the newest patch — so nothing here needs Renovate to move it",
       "matchManagers": ["gomod"],
       "matchDatasources": ["golang-version"],
       "enabled": false
@@ -54,16 +57,6 @@
         "go install (?<depName>\\S+?)(?:/cmd/\\S+?)?@(?<currentDigest>[a-f0-9]{40}) # (?<currentValue>v\\S+)"
       ],
       "datasourceTemplate": "go"
-    },
-    {
-      "description": "Track the GO_VERSION toolchain pin in the CI workflows",
-      "customType": "regex",
-      "managerFilePatterns": ["/^\\.github/workflows/.+\\.ya?ml$/"],
-      "matchStrings": [
-        "GO_VERSION:\\s*'(?<currentValue>\\S+)'"
-      ],
-      "datasourceTemplate": "golang-version",
-      "depNameTemplate": "go"
     },
     {
       "description": "Track the GOLANGCI_LINT_VERSION pin in ci.yml",
