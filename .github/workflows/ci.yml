@@ -26,7 +26,7 @@ jobs:
     outputs:
       floor: ${{ steps.resolve.outputs.floor }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - id: resolve
@@ -137,7 +137,7 @@ jobs:
       - name: upload coverage to Codecov
         # Only the floor run on Linux uploads; otherwise the matrix double-counts.
         if: matrix.go-version == needs.go-version.outputs.floor && matrix.os == 'ubuntu-latest'
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage/unit.out
@@ -146,7 +146,7 @@ jobs:
       - name: upload dsl coverage to Codecov
         # Only the floor run on Linux uploads; otherwise the matrix double-counts.
         if: matrix.go-version == needs.go-version.outputs.floor && matrix.os == 'ubuntu-latest'
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./dsl/coverage.out
