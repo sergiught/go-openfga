@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/openfga/language/pkg/go v0.3.2
-	github.com/sergiught/go-openfga v0.110.0
+	github.com/sergiught/go-openfga v0.111.0
 )
 
 require (
