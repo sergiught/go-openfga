@@ -27,8 +27,15 @@
       "enabled": false
     },
     {
-      "description": "Group all Go minor + patch updates into one PR",
-      "matchManagers": ["gomod"],
+      "description": "Group all Go minor + patch updates into one PR: go.mod requires and the Makefile's `go install` tools",
+      "matchDatasources": ["go"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "go-deps (non-major)",
+      "automerge": false
+    },
+    {
+      "description": "Keep the ci.yml golangci-lint pin in the same PR as its Makefile pin",
+      "matchDepNames": ["golangci/golangci-lint"],
       "matchUpdateTypes": ["minor", "patch"],
       "groupName": "go-deps (non-major)",
       "automerge": false
