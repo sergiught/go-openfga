@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # go.mod's `go` directive is a support floor (1.25.0), not the toolchain we
+  # go.mod's `go` directive is a support floor (1.26.0), not the toolchain we
   # want CI to run. Derive `<major>.<minor>.x` from it so setup-go resolves the
   # newest patch in that line: the floor minor still gets exercised, but with
   # current stdlib fixes so govulncheck stays green without a hand-managed pin.
@@ -160,7 +160,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
-          # All modules share the go 1.25.0 floor; the integration suite runs on
+          # All modules share the go 1.26.0 floor; the integration suite runs on
           # stable to exercise the testcontainers stack on the latest toolchain.
           go-version: 'stable'
           cache: true

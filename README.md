@@ -86,7 +86,7 @@ authentication, retries, and custom headers are layered as composable
 
 ## 📋 Requirements
 
-- Go 1.25 or newer.
+- Go 1.26 or newer.
 - An OpenFGA server to talk to — see the [OpenFGA docs](https://openfga.dev/docs) to run one.
 
 <p align="right"><sub><a href="#-table-of-contents">↑ Back to table of contents</a></sub></p>
