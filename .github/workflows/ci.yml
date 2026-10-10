@@ -177,6 +177,9 @@ jobs:
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version: ${{ needs.go-version.outputs.floor }}
+          # The runner image's cached patch can lag behind go.dev; stdlib
+          # vulns are fixed in patch releases, so always resolve the newest.
+          check-latest: true
           cache: true
       - name: make vuln
         run: make vuln
