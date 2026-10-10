@@ -10,7 +10,7 @@
   "timezone": "Europe/Madrid",
   "rangeStrategy": "bump",
   "constraints": {
-    "go": "1.25"
+    "go": "1.26"
   },
   "labels": ["dependencies"],
   "prConcurrentLimit": 5,
