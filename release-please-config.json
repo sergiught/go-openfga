@@ -32,6 +32,7 @@
       "tag-separator": "/",
       "include-component-in-tag": true,
       "changelog-path": "CHANGELOG.md",
+      "exclude-paths": ["dsl/go.mod", "dsl/go.sum"],
       "bump-minor-pre-major": true,
       "bump-patch-for-minor-pre-major": false,
       "draft": false,
