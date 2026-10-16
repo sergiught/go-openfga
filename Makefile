@@ -18,7 +18,7 @@ help: ## Show this help message and exit
 #-----------------------------------------------------------------------------------------------------------------------
 $(BINARIES_DIR)/golangci-lint:
 	@echo "==> Installing golangci-lint within ${BINARIES_DIR}"
-	@GOBIN=$(BINARIES_DIR) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@114493f9b3e7257d29e4130f2b4a4aadefbb6845 # v2.14.0
+	@GOBIN=$(BINARIES_DIR) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@25c5369a93aacb8cccea0d46e1569ca4a194564d # v2.15.0
 
 $(BINARIES_DIR)/commitlint:
 	@echo "==> Installing commitlint within ${BINARIES_DIR}"
@@ -26,7 +26,7 @@ $(BINARIES_DIR)/commitlint:
 
 $(BINARIES_DIR)/govulncheck:
 	@echo "==> Installing govulncheck within ${BINARIES_DIR}"
-	@GOBIN=$(BINARIES_DIR) go install golang.org/x/vuln/cmd/govulncheck@709015412431dd2b5b28a53c06c70bc02d49074c # v1.8.0
+	@GOBIN=$(BINARIES_DIR) go install golang.org/x/vuln/cmd/govulncheck@e672cbe8fbc8c76e28fcb6db0efd9ce354e0dac5 # v1.9.0
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Test (https://pkg.go.dev/testing — unit + coverage + testcontainers integration)
